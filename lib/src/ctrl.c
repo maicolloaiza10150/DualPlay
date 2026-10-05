@@ -611,7 +611,8 @@ static void *ctrl_thread_func(void *user)
 				break;
 			}
 			CHIAKI_LOGI(ctrl->session->log, "CTRL RECEIVED");
-			chiaki_log_hexdump(ctrl->session->log, CHIAKI_LOG_INFO, ctrl->recv_buf + ctrl->recv_buf_size, received);
+			// DUALPLAY: raw ctrl bytes can contain the session id; only dump at VERBOSE (never in release logs).
+			chiaki_log_hexdump(ctrl->session->log, CHIAKI_LOG_VERBOSE, ctrl->recv_buf + ctrl->recv_buf_size, received);
 		}
 
 
@@ -785,7 +786,8 @@ CHIAKI_EXPORT ChiakiErrorCode ctrl_message_set_fallback_session_id(ChiakiCtrl *c
 		return err;
 	}
 	memcpy(ctrl->session->session_id, fallback_session_id, sizeof(fallback_session_id));
-	CHIAKI_LOGI(ctrl->session->log, "Ctrl set fallback session Id %s", ctrl->session->session_id);
+	// DUALPLAY: do not log the full session id (secret); show only the first 4 chars.
+	CHIAKI_LOGI(ctrl->session->log, "Ctrl set fallback session Id %.4s...", ctrl->session->session_id);
 	ctrl->session->ctrl_session_id_received = true;
 	chiaki_mutex_unlock(&ctrl->session->state_mutex);
 	chiaki_cond_signal(&ctrl->session->state_cond);
@@ -843,7 +845,8 @@ static void ctrl_message_received(ChiakiCtrl *ctrl, uint16_t msg_type, uint8_t *
 			break;
 		default:
 			// CHIAKI_LOGW(ctrl->session->log, "Received Ctrl Message with unknown type %#x", msg_type);
-			chiaki_log_hexdump(ctrl->session->log, CHIAKI_LOG_WARNING, payload, payload_size);
+			// DUALPLAY: payload may be sensitive; dump only at VERBOSE.
+			chiaki_log_hexdump(ctrl->session->log, CHIAKI_LOG_VERBOSE, payload, payload_size);
 			break;
 	}
 }
@@ -886,7 +889,8 @@ static void ctrl_message_received_session_id(ChiakiCtrl *ctrl, uint8_t *payload,
 
 	if(payload_size < 2)
 	{
-		CHIAKI_LOGE(ctrl->session->log, "Invalid Session Id \"%s\" received", payload);
+		// DUALPLAY: do not print the payload in clear (may be a secret and is not guaranteed NUL-terminated).
+		CHIAKI_LOGE(ctrl->session->log, "Invalid Session Id received (payload size %llu)", (unsigned long long)payload_size);
 		ctrl_message_set_fallback_session_id(ctrl);
 		return;
 	}
@@ -894,7 +898,8 @@ static void ctrl_message_received_session_id(ChiakiCtrl *ctrl, uint8_t *payload,
 	if(payload[0] != 0x4a)
 	{
 		CHIAKI_LOGW(ctrl->session->log, "Received presumably invalid Session Id:");
-		chiaki_log_hexdump(ctrl->session->log, CHIAKI_LOG_WARNING, payload, payload_size);
+		// DUALPLAY: payload is (presumably) the session id; dump only at VERBOSE.
+		chiaki_log_hexdump(ctrl->session->log, CHIAKI_LOG_VERBOSE, payload, payload_size);
 	}
 
 	// skip the size
@@ -932,7 +937,8 @@ static void ctrl_message_received_session_id(ChiakiCtrl *ctrl, uint8_t *payload,
 	chiaki_mutex_lock(&ctrl->session->state_mutex);
 	memcpy(ctrl->session->session_id, payload, payload_size);
 	ctrl->session->session_id[payload_size] = '\0';
-	CHIAKI_LOGI(ctrl->session->log, "Ctrl received valid Session Id: %s", ctrl->session->session_id);
+	// DUALPLAY: do not log the full session id (secret); show only the first 4 chars.
+	CHIAKI_LOGI(ctrl->session->log, "Ctrl received valid Session Id: %.4s...", ctrl->session->session_id);
 	ctrl->session->ctrl_session_id_received = true;
 	chiaki_mutex_unlock(&ctrl->session->state_mutex);
 	chiaki_cond_signal(&ctrl->session->state_cond);

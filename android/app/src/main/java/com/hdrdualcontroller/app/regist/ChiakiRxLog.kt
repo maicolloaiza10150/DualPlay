@@ -2,6 +2,7 @@
 
 package com.hdrdualcontroller.app.regist
 
+import com.hdrdualcontroller.app.common.LogRedactor
 import com.hdrdualcontroller.app.lib.ChiakiLog
 import kotlinx.coroutines.flow.MutableStateFlow
 import kotlinx.coroutines.flow.StateFlow
@@ -18,7 +19,7 @@ class ChiakiRxLog(levelMask: Int)
 	val log = ChiakiLog(levelMask, callback = { level, text ->
 		accMutex.withLock {
 			val cur = _logText.value
-			_logText.value = cur + (if(cur.isEmpty()) "" else "\n") + ChiakiLog.formatLog(level, text)
+			_logText.value = cur + (if(cur.isEmpty()) "" else "\n") + LogRedactor.redact(ChiakiLog.formatLog(level, text))
 		}
 	})
 }

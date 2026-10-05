@@ -19,6 +19,8 @@ import androidx.recyclerview.widget.RecyclerView
 import com.hdrdualcontroller.app.R
 import com.hdrdualcontroller.app.common.LogFile
 import com.hdrdualcontroller.app.common.LogManager
+import com.hdrdualcontroller.app.common.LogRedactor
+import java.io.File
 import com.hdrdualcontroller.app.common.ext.viewModelFactory
 import com.hdrdualcontroller.app.common.fileProviderAuthority
 import com.hdrdualcontroller.app.databinding.FragmentSettingsLogsBinding
@@ -69,7 +71,16 @@ class SettingsLogsFragment: AppCompatDialogFragment(), TitleFragment
 	private fun shareLogFile(file: LogFile)
 	{
 		val activity = activity ?: return
-		val uri = FileProvider.getUriForFile(activity, fileProviderAuthority, file.file)
+		// DUALPLAY: se comparte una copia redactada (sin Session ID, claves ni PIN), nunca el original.
+		val redacted = try
+		{
+			LogRedactor.redactFile(file.file, File(File(activity.cacheDir, "export_settings"), "redacted_${file.filename}"))
+		}
+		catch(e: java.io.IOException)
+		{
+			return
+		}
+		val uri = FileProvider.getUriForFile(activity, fileProviderAuthority, redacted)
 		Intent(Intent.ACTION_SEND).also {
 			it.addFlags(Intent.FLAG_GRANT_READ_URI_PERMISSION)
 			it.type = "text/plain"

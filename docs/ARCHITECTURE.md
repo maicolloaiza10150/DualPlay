@@ -108,3 +108,30 @@ igual que el "emulated haptic rumble" de chiaki-ng desktop.
 - Un juego con HDR: comparar contra la TV, revisar que negros y brillos no se vean lavados.
 - Control Xbox o 8BitDo: todos los botones, remapeo, rumble.
 - 30 min de sesión: medir temperatura, caídas de frames (overlay de estadísticas) y latencia de input.
+
+## 6. Capa de UI (Compose) y límites de módulos
+
+Detalle de fases en `docs/PLAN-COMPOSE.md`.
+
+```
+ ui/ (Compose, Navigation)  ──▶  ViewModels (StateFlow)  ──▶  data/ (Room, DataStore, EncryptedSharedPreferences)
+        │                                │
+        │                                └──▶ psn/ (OAuth: authorization_code → token → Account ID)
+        └── StreamScreen: SurfaceView en AndroidView (nunca TextureView) + controles táctiles con pointerInput
+                                         │
+                                         ▼
+                              stream/ (StreamSession) ──▶ lib/ChiakiNative ──▶ JNI ──▶ lib/ (C)
+```
+
+- La UI no conoce JNI ni `lib/`; solo habla con ViewModels y `stream/`.
+- `psn/` es el único código que maneja tokens; se guardan en `EncryptedSharedPreferences`, nunca en logs.
+- Migración incremental: las Activities XML conviven con Compose hasta la Fase E del plan.
+
+## 7. Política de logs (secretos)
+
+- Nunca se registran en claro: Session ID, regist key, morning, PIN, tokens PSN, Account ID.
+- `lib/`: el Session ID se muestra enmascarado (4 primeros caracteres); los hexdumps de payloads de ctrl
+  van a nivel VERBOSE, no INFO/WARNING. Cambios mínimos marcados `// DUALPLAY:`.
+- Puente JNI: en builds release (`NDEBUG`) el nivel VERBOSE queda desactivado aunque el usuario lo pida.
+- Kotlin: todo log que sale de la app (compartir/exportar) pasa por `LogRedactor`, con tests JVM.
+- Verificación: tras una sesión y un registro, `grep` de los valores reales en logcat y `session_logs` = 0 coincidencias.

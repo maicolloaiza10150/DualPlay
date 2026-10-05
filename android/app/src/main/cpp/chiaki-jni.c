@@ -211,7 +211,13 @@ JNIEXPORT void JNICALL JNI_FCN(sessionCreate)(JNIEnv *env, jobject obj, jobject 
 	AndroidChiakiSession *session = NULL;
 	ChiakiLog *log = malloc(sizeof(ChiakiLog));
 	const char *log_file = log_file_str ? E->GetStringUTFChars(env, log_file_str, NULL) : NULL;
+#ifdef NDEBUG
+	// DUALPLAY: release builds never enable VERBOSE logs (hexdumps may contain secrets), regardless of log_verbose.
+	(void)log_verbose;
+	android_chiaki_file_log_init(log, CHIAKI_LOG_ALL & ~CHIAKI_LOG_VERBOSE, log_file);
+#else
 	android_chiaki_file_log_init(log, log_verbose ? CHIAKI_LOG_ALL : (CHIAKI_LOG_ALL & ~CHIAKI_LOG_VERBOSE), log_file);
+#endif
 	if(log_file)
 		E->ReleaseStringUTFChars(env, log_file_str, log_file);
 
