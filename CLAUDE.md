@@ -14,7 +14,7 @@ Layout de upstream: la raíz de Gradle es `android/`. Ejecuta los comandos de Gr
 ```bash
 cd android
 ./gradlew :app:assembleDebug                      # compilar (solo arm64-v8a)
-adb install -r "$(wslpath -w app/build/outputs/apk/debug/app-debug.apk)"
+adb install -r --user 0 "$(wslpath -w app/build/outputs/apk/debug/app-debug.apk)"   # --user 0: sin copia en "Dual App" de Samsung
 ./gradlew :app:testDebugUnitTest                  # tests JVM (parsers y builders de reportes HID)
 ./gradlew :app:connectedDebugAndroidTest          # tests en el S23 FE conectado por adb
 adb logcat -v color -s DualPlay:* chiaki:* MediaCodec:* AudioTrack:*
