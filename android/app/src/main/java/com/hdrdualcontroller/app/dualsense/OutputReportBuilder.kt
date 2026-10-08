@@ -45,12 +45,6 @@ class TriggerEffect(val mode: Int, val params: ByteArray = ByteArray(PARAM_SIZE)
  *    primer byte y los 10 parámetros a continuación, igual que aquí. (Su comentario "0x04 left / 0x08 right" está
  *    invertido respecto a SDL; como siempre se activan ambos bits no afecta.)
  *
- * Bluetooth (report id 0x31, 78 bytes): `struct dualsense_output_report_bt` de hid-playstation = report_id, seq_tag
- * (secuencia en el nibble alto), tag 0x10, el MISMO bloque común de 47 bytes (desde el offset 3), 24 reservados y
- * CRC32 little-endian al final. El CRC es el CRC-32 estándar (zlib) calculado sobre el byte semilla 0xA2 (cabecera
- * HIDP DATA|OUTPUT, PS_OUTPUT_CRC32_SEED) seguido del reporte sin los 4 bytes del CRC (ver `ps_..._crc32` en
- * hid-playstation.c y SDL: `ubHdr = 0xA2`). Por el canal interrupt L2CAP se envía 0xA2 + reporte.
- *
  * No se rellenan volumen de audio, LEDs ni el byte de intensidad: solo gatillos.
  */
 object OutputReportBuilder
@@ -68,56 +62,29 @@ object OutputReportBuilder
 	const val ENABLE_RIGHT_TRIGGER = 0x04
 	const val ENABLE_LEFT_TRIGGER = 0x08
 
-	const val REPORT_ID_BT = 0x31
-	const val BT_REPORT_SIZE = 78
-	const val BT_TAG = 0x10
-	const val BT_CRC_SEED = 0xA2
-
 	/** Un `null` deja el gatillo como está (su bit de validez no se activa). */
 	fun triggerEffects(left: TriggerEffect?, right: TriggerEffect?): ByteArray
 	{
 		val report = ByteArray(USB_REPORT_SIZE)
 		report[0] = REPORT_ID_USB.toByte()
-		fillTriggers(report, 1, left, right)
-		return report
-	}
-
-	/** Versión Bluetooth: 78 bytes con tag y CRC. `sequence` es el contador de 4 bits de hid-playstation. */
-	fun triggerEffectsBluetooth(left: TriggerEffect?, right: TriggerEffect?, sequence: Int = 0): ByteArray
-	{
-		val report = ByteArray(BT_REPORT_SIZE)
-		report[0] = REPORT_ID_BT.toByte()
-		report[1] = ((sequence and 0x0f) shl 4).toByte()
-		report[2] = BT_TAG.toByte()
-		fillTriggers(report, 3, left, right)
-		val crc = java.util.zip.CRC32()
-		crc.update(BT_CRC_SEED)
-		crc.update(report, 0, BT_REPORT_SIZE - 4)
-		val value = crc.value
-		for(i in 0 until 4)
-			report[BT_REPORT_SIZE - 4 + i] = ((value shr (8 * i)) and 0xff).toByte()
-		return report
-	}
-
-	/** `commonStart` = posición del primer byte del bloque común dentro del reporte (1 en USB, 3 en BT). */
-	private fun fillTriggers(report: ByteArray, commonStart: Int, left: TriggerEffect?, right: TriggerEffect?)
-	{
 		var enable = 0
 		if(right != null)
 		{
 			enable = enable or ENABLE_RIGHT_TRIGGER
-			put(report, commonStart + OFFSET_RIGHT_TRIGGER, right)
+			put(report, OFFSET_RIGHT_TRIGGER, right)
 		}
 		if(left != null)
 		{
 			enable = enable or ENABLE_LEFT_TRIGGER
-			put(report, commonStart + OFFSET_LEFT_TRIGGER, left)
+			put(report, OFFSET_LEFT_TRIGGER, left)
 		}
-		report[commonStart + OFFSET_ENABLE_BITS_1] = enable.toByte()
+		report[1 + OFFSET_ENABLE_BITS_1] = enable.toByte()
+		return report
 	}
 
-	private fun put(report: ByteArray, start: Int, effect: TriggerEffect)
+	private fun put(report: ByteArray, commonOffset: Int, effect: TriggerEffect)
 	{
+		val start = 1 + commonOffset // +1 por el report id
 		report[start] = effect.mode.toByte()
 		effect.params.copyInto(report, start + 1)
 	}

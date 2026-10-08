@@ -142,9 +142,6 @@ dependencies {
 
     implementation libs.security.crypto
 
-    // DUALPLAY SPIKE C (Bluetooth): solo para probar L2CAP clásico por reflexión. Quitar si el spike no prospera.
-    implementation "org.lsposed.hiddenapibypass:hiddenapibypass:6.1"
-
     implementation libs.coroutines.android
 
     implementation libs.room.runtime

@@ -18,7 +18,6 @@ import com.hdrdualcontroller.app.ui.regist.RegistScreen
 import com.hdrdualcontroller.app.ui.settings.LogsScreen
 import com.hdrdualcontroller.app.ui.settings.RegisteredHostsScreen
 import com.hdrdualcontroller.app.ui.settings.SettingsScreen
-import com.hdrdualcontroller.app.ui.spike.DualSenseBluetoothSpikeScreen
 import com.hdrdualcontroller.app.ui.spike.DualSenseSpikeScreen
 import android.net.Uri
 
@@ -30,7 +29,6 @@ private object Routes
 	const val LOGS = "settings/logs"
 	const val PSN_LOGIN = "psn"
 	const val SPIKE_DUALSENSE = "spike/dualsense"
-	const val SPIKE_BLUETOOTH = "spike/bluetooth"
 	const val MANUAL = "manual?id={id}"
 	const val REGIST = "regist?host={host}&manualId={manualId}"
 	const val REGIST_EXECUTE = "regist/execute"
@@ -65,12 +63,7 @@ fun AppNavHost()
 				onOpenRegisteredHosts = { navController.navigate(Routes.REGISTERED_HOSTS) },
 				onOpenLogs = { navController.navigate(Routes.LOGS) },
 				onPsnLogin = { navController.navigate(Routes.PSN_LOGIN) },
-				onOpenDualSenseSpike = { navController.navigate(Routes.SPIKE_DUALSENSE) },
-				onOpenBluetoothSpike = { navController.navigate(Routes.SPIKE_BLUETOOTH) })
-		}
-
-		composable(Routes.SPIKE_BLUETOOTH) {
-			DualSenseBluetoothSpikeScreen(onBack = { navController.popBackStack() })
+				onOpenDualSenseSpike = { navController.navigate(Routes.SPIKE_DUALSENSE) })
 		}
 
 		composable(Routes.SPIKE_DUALSENSE) {

@@ -100,6 +100,13 @@ igual que el "emulated haptic rumble" de chiaki-ng desktop.
 - Android no permite a una app normal enviar reportes HID arbitrarios a un control conectado por Bluetooth.
   Gatillos adaptativos y háptica HD requieren cable USB-C. Investigar Shizuku/root solo como opción
   experimental y desactivada por defecto; nunca como requisito.
+- **SPIKE C (2026-10-08, S23 FE, Android 16): gatillos por Bluetooth clásico descartados.** Con `hiddenapibypass` la app SÍ puede
+  crear `BluetoothDevice.createInsecureL2capSocket(0x11)` y la pila registra el PSM y conecta con el control (el sistema no
+  bloquea el PSM). Pero la pila de Bluetooth (mainline) crea TODO socket L2CAP clásico con ERTM obligatorio
+  (`btif_sock_l2cap.cc`: `obex_l2c_etm_opt`, "Mandatory for OBEX over l2cap") y el DualSense solo soporta modo básico:
+  `l2c_fcr_chk_chan_modes` aborta con "Peer does not support our desired channel types" antes de enviar nada.
+  No hay opción de app para evitarlo. Vías que quedan: cable USB-C, o un adaptador Bluetooth USB con pila propia
+  (BTstack sobre HCI por USB). El código del spike está en el historial de git (commit f350937c y su revert).
 - DualSense + audífonos Bluetooth + Wi-Fi 2.4 GHz compiten por la misma banda: recomendar Wi-Fi 5 GHz en la UI.
 
 ## 5. Checklist de prueba manual (S23 FE)
