@@ -101,6 +101,12 @@ class StreamSession(val connectInfo: ConnectInfo, val logManager: LogManager, va
 			override fun surfaceChanged(holder: SurfaceHolder, format: Int, width: Int, height: Int)
 			{
 				val surface = holder.surface
+				// DUALPLAY: el stream es de ritmo fijo (30/60 fps); sin esto la pantalla de 120 Hz puede hacer judder.
+				// Solo cambia de modo si es sin parpadeo.
+				surface.setFrameRate(
+					connectInfo.videoProfile.maxFPS.toFloat(),
+					Surface.FRAME_RATE_COMPATIBILITY_FIXED_SOURCE,
+					Surface.CHANGE_FRAME_RATE_ONLY_IF_SEAMLESS)
 				this@StreamSession.surface = surface
 				session?.setSurface(surface)
 			}

@@ -30,5 +30,8 @@
     <string name="regist_get_account_id_from_psn">Get Account ID from PSN</string>
     <string name="regist_account_id_filled">Account ID filled from your PSN account</string>
 
+    <string name="preferences_codec_title_h265_hdr">H265 HDR (PS5 only, HDR10 display)</string>
+    <string name="stream_hdr_unavailable">HDR is not available on this phone or display. Using H265 SDR.</string>
+
     <string name="preferences_bitrate_dialog_hint">Empty = automatic</string>
 </resources>

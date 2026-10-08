@@ -36,7 +36,9 @@ class Preferences(context: Context)
 	enum class Codec(val value: String, @StringRes val title: Int, val codec: com.hdrdualcontroller.app.lib.Codec)
 	{
 		CODEC_H264("h264", R.string.preferences_codec_title_h264, com.hdrdualcontroller.app.lib.Codec.CODEC_H264),
-		CODEC_H265("h265", R.string.preferences_codec_title_h265, com.hdrdualcontroller.app.lib.Codec.CODEC_H265)
+		CODEC_H265("h265", R.string.preferences_codec_title_h265, com.hdrdualcontroller.app.lib.Codec.CODEC_H265),
+		// DUALPLAY: HEVC Main10 HDR10; se degrada a CODEC_H265 si el teléfono no lo soporta (stream/HdrSupport.kt).
+		CODEC_H265_HDR("h265_hdr", R.string.preferences_codec_title_h265_hdr, com.hdrdualcontroller.app.lib.Codec.CODEC_H265_HDR)
 	}
 
 	companion object

@@ -4,6 +4,7 @@ package com.hdrdualcontroller.app.ui.main
 
 import android.content.Intent
 import android.graphics.Typeface
+import android.widget.Toast
 import androidx.activity.compose.BackHandler
 import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
@@ -64,6 +65,7 @@ import com.hdrdualcontroller.app.common.getDatabase
 import com.hdrdualcontroller.app.lib.ConnectInfo
 import com.hdrdualcontroller.app.lib.DiscoveryHost
 import com.hdrdualcontroller.app.main.MainViewModel
+import com.hdrdualcontroller.app.stream.HdrSupport
 import com.hdrdualcontroller.app.stream.StreamActivity
 import com.hdrdualcontroller.app.ui.AppScaffold
 import com.hdrdualcontroller.app.ui.DrawableIcon
@@ -101,7 +103,12 @@ fun MainScreen(
 	fun connect(host: DisplayHost)
 	{
 		val registeredHost = host.registeredHost ?: return
-		val connectInfo = ConnectInfo(host.isPS5, host.host, registeredHost.rpRegistKey, registeredHost.rpKey, Preferences(context).videoProfile)
+		val requested = Preferences(context).videoProfile
+		// DUALPLAY: si se pidió HDR y el teléfono no puede, se baja a HEVC SDR y se avisa.
+		val profile = HdrSupport.adjust(context, requested)
+		if(profile.codec != requested.codec)
+			Toast.makeText(context, R.string.stream_hdr_unavailable, Toast.LENGTH_LONG).show()
+		val connectInfo = ConnectInfo(host.isPS5, host.host, registeredHost.rpRegistKey, registeredHost.rpKey, profile)
 		context.startActivity(Intent(context, StreamActivity::class.java).putExtra(StreamActivity.EXTRA_CONNECT_INFO, connectInfo))
 	}
 

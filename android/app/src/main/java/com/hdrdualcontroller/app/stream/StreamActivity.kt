@@ -13,6 +13,7 @@ import androidx.appcompat.app.AppCompatActivity
 import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.core.view.ViewCompat
+import android.content.pm.ActivityInfo
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -25,6 +26,7 @@ import com.hdrdualcontroller.app.R
 import com.hdrdualcontroller.app.common.Preferences
 import com.hdrdualcontroller.app.common.ext.viewModelFactory
 import com.hdrdualcontroller.app.databinding.ActivityStreamBinding
+import com.hdrdualcontroller.app.lib.Codec
 import com.hdrdualcontroller.app.lib.ConnectInfo
 import com.hdrdualcontroller.app.lib.ConnectVideoProfile
 import com.hdrdualcontroller.app.session.*
@@ -74,6 +76,11 @@ class StreamActivity : AppCompatActivity()
 
 		binding = ActivityStreamBinding.inflate(layoutInflater)
 		setContentView(binding.root)
+
+		// DUALPLAY: sin COLOR_MODE_HDR la ventana se compone en SDR y el HDR10 sale lavado. Solo si el stream es HDR
+		// (el perfil ya pasó por HdrSupport.adjust, así que la pantalla lo soporta).
+		if(connectInfo.videoProfile.codec == Codec.CODEC_H265_HDR)
+			window.colorMode = ActivityInfo.COLOR_MODE_HDR
 
 		WindowCompat.setDecorFitsSystemWindows(window, false)
 		insetsController = WindowCompat.getInsetsController(window, window.decorView)

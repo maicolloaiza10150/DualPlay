@@ -88,7 +88,7 @@ void android_chiaki_video_decoder_set_surface(AndroidChiakiVideoDecoder *decoder
 	decoder->window = ANativeWindow_fromSurface(env, surface);
 
 	const char *mime = chiaki_codec_is_h265(decoder->target_codec) ? "video/hevc" : "video/avc";
-	CHIAKI_LOGI(decoder->log, "Initializing decoder with mime %s", mime);
+	CHIAKI_LOGI(decoder->log, "Initializing decoder with mime %s (codec %s)", mime, chiaki_codec_name(decoder->target_codec));
 
 	decoder->codec = AMediaCodec_createDecoderByType(mime);
 	if(!decoder->codec)
@@ -96,11 +96,32 @@ void android_chiaki_video_decoder_set_surface(AndroidChiakiVideoDecoder *decoder
 		CHIAKI_LOGE(decoder->log, "Failed to create AMediaCodec for mime type %s", mime);
 		goto error_surface;
 	}
+	{
+		char *codec_name = NULL;
+		if(AMediaCodec_getName(decoder->codec, &codec_name) == AMEDIA_OK && codec_name)
+		{
+			CHIAKI_LOGI(decoder->log, "Video decoder component: %s", codec_name);
+			AMediaCodec_releaseName(decoder->codec, codec_name);
+		}
+	}
 
 	AMediaFormat *format = AMediaFormat_new();
 	AMediaFormat_setString(format, AMEDIAFORMAT_KEY_MIME, mime);
 	AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_WIDTH, decoder->target_width);
 	AMediaFormat_setInt32(format, AMEDIAFORMAT_KEY_HEIGHT, decoder->target_height);
+
+	// DUALPLAY: baja latencia (docs/ARCHITECTURE.md 2.2). Claves en texto para no depender del API level del NDK;
+	// un decoder que no las conozca las ignora.
+	AMediaFormat_setInt32(format, "low-latency", 1); // MediaFormat.KEY_LOW_LATENCY
+	AMediaFormat_setInt32(format, "priority", 0); // MediaFormat.KEY_PRIORITY: 0 = tiempo real
+	if(chiaki_codec_is_hdr(decoder->target_codec))
+	{
+		// DUALPLAY: HDR10 = BT.2020 + PQ (SMPTE ST 2084) + rango limitado. Son pistas para el decoder; los valores
+		// reales vienen en el VUI/SEI del stream HEVC Main10 de la PS5.
+		AMediaFormat_setInt32(format, "color-standard", 6); // MediaFormat.COLOR_STANDARD_BT2020
+		AMediaFormat_setInt32(format, "color-transfer", 6); // MediaFormat.COLOR_TRANSFER_ST2084
+		AMediaFormat_setInt32(format, "color-range", 2); // MediaFormat.COLOR_RANGE_LIMITED
+	}
 
 	media_status_t r = AMediaCodec_configure(decoder->codec, format, decoder->window, NULL, 0);
 	if(r != AMEDIA_OK)
@@ -200,6 +221,23 @@ static void *android_chiaki_video_decoder_output_thread_func(void *user)
 			{
 				CHIAKI_LOGI(decoder->log, "AMediaCodec reported EOS");
 				break;
+			}
+		}
+		else if(status == AMEDIACODEC_INFO_OUTPUT_FORMAT_CHANGED)
+		{
+			// DUALPLAY: formato de salida real del decoder (color-standard 6 / color-transfer 6 = HDR10 activo).
+			AMediaFormat *out = AMediaCodec_getOutputFormat(decoder->codec);
+			if(out)
+			{
+				int32_t standard = -1, transfer = -1, range = -1, w = 0, h = 0;
+				AMediaFormat_getInt32(out, "color-standard", &standard);
+				AMediaFormat_getInt32(out, "color-transfer", &transfer);
+				AMediaFormat_getInt32(out, "color-range", &range);
+				AMediaFormat_getInt32(out, AMEDIAFORMAT_KEY_WIDTH, &w);
+				AMediaFormat_getInt32(out, AMEDIAFORMAT_KEY_HEIGHT, &h);
+				CHIAKI_LOGI(decoder->log, "Video decoder output format: %dx%d color-standard=%d color-transfer=%d color-range=%d",
+						(int)w, (int)h, (int)standard, (int)transfer, (int)range);
+				AMediaFormat_delete(out);
 			}
 		}
 		else
