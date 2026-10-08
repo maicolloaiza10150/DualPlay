@@ -1,0 +1,34 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- DUALPLAY: textos propios del fork, separados de strings.xml para no generar conflictos al hacer merge desde upstream. -->
+<resources>
+    <string name="action_back">Back</string>
+    <string name="action_more">More options</string>
+    <string name="action_ok">OK</string>
+    <string name="action_cancel">Cancel</string>
+    <string name="action_done">Done</string>
+
+    <string name="psn_account_title">PSN Account</string>
+    <string name="psn_account_signed_out">Not signed in. Sign in to fill the Account ID when registering a console.</string>
+    <string name="psn_account_signed_in">Signed in as %s</string>
+    <string name="psn_account_signed_in_unknown_name">Signed in</string>
+    <string name="psn_sign_in">Sign in with PSN</string>
+    <string name="psn_sign_out">Sign out</string>
+    <string name="psn_sign_out_summary">Removes the stored Account ID from this device</string>
+
+    <string name="psn_login_title">Sign in to PSN</string>
+    <string name="psn_login_getting_account">Getting your Account ID…</string>
+    <string name="psn_login_error">Could not get your Account ID: %s</string>
+    <string name="psn_login_retry">Try again</string>
+    <string name="psn_login_use_browser">Use browser instead</string>
+    <string name="psn_login_paste_title">Paste redirect URL</string>
+    <string name="psn_login_paste_info">Sign in on the PlayStation page in your browser. When it shows a page named \"redirect\", copy its full address and paste it here.</string>
+    <string name="psn_login_paste_hint">Redirect URL</string>
+    <string name="psn_login_open_browser">Open sign-in page</string>
+    <string name="psn_login_paste_invalid">That address has no sign-in code.</string>
+    <string name="psn_login_paste_submit">Get Account ID</string>
+
+    <string name="regist_get_account_id_from_psn">Get Account ID from PSN</string>
+    <string name="regist_account_id_filled">Account ID filled from your PSN account</string>
+
+    <string name="preferences_bitrate_dialog_hint">Empty = automatic</string>
+</resources>

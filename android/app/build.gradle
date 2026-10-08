@@ -57,7 +57,13 @@ android {
 
     buildFeatures {
         viewBinding true
+        compose true
         prefab true
+    }
+
+    composeOptions {
+        // Compose Compiler 1.5.14 <-> Kotlin 1.9.24 (ver gradle/libs.versions.toml).
+        kotlinCompilerExtensionVersion "1.5.14"
     }
 
     compileOptions {
@@ -123,6 +129,18 @@ dependencies {
 
     implementation libs.lifecycle.viewmodel.ktx
     implementation libs.lifecycle.livedata.ktx
+    implementation libs.lifecycle.runtime.compose
+
+    implementation platform(libs.compose.bom)
+    implementation libs.compose.ui
+    implementation libs.compose.ui.tooling.preview
+    implementation libs.compose.material3
+    implementation libs.compose.runtime.livedata
+    implementation libs.activity.compose
+    implementation libs.navigation.compose
+    debugImplementation libs.compose.ui.tooling
+
+    implementation libs.security.crypto
 
     implementation libs.coroutines.android
 

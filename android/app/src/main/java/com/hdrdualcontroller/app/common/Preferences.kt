@@ -53,7 +53,7 @@ class Preferences(context: Context)
 	private val sharedPreferenceChangeListener = SharedPreferences.OnSharedPreferenceChangeListener { _, key ->
 		when(key)
 		{
-			resolutionKey -> _bitrateAutoFlow.value = bitrateAuto
+			resolutionKey, fpsKey, codecKey -> _bitrateAutoFlow.value = bitrateAuto
 		}
 	}.also { sharedPreferences.registerOnSharedPreferenceChangeListener(it) }
 

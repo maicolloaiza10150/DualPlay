@@ -52,8 +52,8 @@ class EditManualConsoleViewModel(val database: AppDatabase, manualHostId: Long?)
 
 	var selectedRegisteredHost = MutableLiveData<RegisteredHost?>(null)
 
-	fun saveHost(host: String)
-	{
+	/** DUALPLAY: devuelve el Job para que la UI espere a que se escriba en la base antes de cerrar la pantalla. */
+	fun saveHost(host: String) =
 		viewModelScope.launch(Dispatchers.IO) {
 			val registeredHost = selectedRegisteredHost.value?.id
 			val existingHost = existingHost?.value
@@ -62,5 +62,4 @@ class EditManualConsoleViewModel(val database: AppDatabase, manualHostId: Long?)
 			else
 				database.manualHostDao().insert(ManualHost(host = host, registeredHost = registeredHost))
 		}
-	}
 }

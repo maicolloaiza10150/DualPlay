@@ -50,25 +50,6 @@
             android:name=".stream.StreamActivity"
             android:theme="@style/StreamTheme"
             android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
-
-        <activity
-            android:name=".settings.SettingsActivity" />
-
-        <activity
-            android:name=".regist.RegistActivity"
-            android:theme="@style/MageTheme"
-            android:configChanges="keyboard|keyboardHidden|orientation|screenSize"
-            android:windowSoftInputMode="adjustResize"/>
-
-        <activity
-            android:name=".regist.RegistExecuteActivity"
-            android:theme="@style/MageTheme"
-            android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
-
-        <activity
-            android:name=".manualconsole.EditManualConsoleActivity"
-            android:theme="@style/MageTheme"
-            android:configChanges="keyboard|keyboardHidden|orientation|screenSize" />
     </application>
 
 </manifest>
