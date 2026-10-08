@@ -18,6 +18,7 @@ import com.hdrdualcontroller.app.ui.regist.RegistScreen
 import com.hdrdualcontroller.app.ui.settings.LogsScreen
 import com.hdrdualcontroller.app.ui.settings.RegisteredHostsScreen
 import com.hdrdualcontroller.app.ui.settings.SettingsScreen
+import com.hdrdualcontroller.app.ui.spike.DualSenseSpikeScreen
 import android.net.Uri
 
 private object Routes
@@ -27,6 +28,7 @@ private object Routes
 	const val REGISTERED_HOSTS = "settings/hosts"
 	const val LOGS = "settings/logs"
 	const val PSN_LOGIN = "psn"
+	const val SPIKE_DUALSENSE = "spike/dualsense"
 	const val MANUAL = "manual?id={id}"
 	const val REGIST = "regist?host={host}&manualId={manualId}"
 	const val REGIST_EXECUTE = "regist/execute"
@@ -60,7 +62,12 @@ fun AppNavHost()
 				onBack = { navController.popBackStack() },
 				onOpenRegisteredHosts = { navController.navigate(Routes.REGISTERED_HOSTS) },
 				onOpenLogs = { navController.navigate(Routes.LOGS) },
-				onPsnLogin = { navController.navigate(Routes.PSN_LOGIN) })
+				onPsnLogin = { navController.navigate(Routes.PSN_LOGIN) },
+				onOpenDualSenseSpike = { navController.navigate(Routes.SPIKE_DUALSENSE) })
+		}
+
+		composable(Routes.SPIKE_DUALSENSE) {
+			DualSenseSpikeScreen(onBack = { navController.popBackStack() })
 		}
 
 		composable(Routes.REGISTERED_HOSTS) {

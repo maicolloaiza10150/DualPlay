@@ -33,5 +33,9 @@
     <string name="preferences_codec_title_h265_hdr">H265 HDR (PS5 only, HDR10 display)</string>
     <string name="stream_hdr_unavailable">HDR is not available on this phone or display. Using H265 SDR.</string>
 
+    <string name="developer_category_title">Developer</string>
+    <string name="developer_dualsense_spike_title">DualSense USB spike</string>
+    <string name="developer_dualsense_spike_summary">Trigger effects over USB-C (debug builds only)</string>
+
     <string name="preferences_bitrate_dialog_hint">Empty = automatic</string>
 </resources>

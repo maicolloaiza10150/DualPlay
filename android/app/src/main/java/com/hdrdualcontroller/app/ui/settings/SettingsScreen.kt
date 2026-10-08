@@ -4,6 +4,7 @@ package com.hdrdualcontroller.app.ui.settings
 
 import android.app.Activity
 import android.content.Context
+import android.content.pm.ApplicationInfo
 import android.content.ContextWrapper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -61,7 +62,13 @@ private tailrec fun Context.findActivity(): Activity? = when(this)
 }
 
 @Composable
-fun SettingsScreen(onBack: () -> Unit, onOpenRegisteredHosts: () -> Unit, onOpenLogs: () -> Unit, onPsnLogin: () -> Unit)
+fun SettingsScreen(
+	onBack: () -> Unit,
+	onOpenRegisteredHosts: () -> Unit,
+	onOpenLogs: () -> Unit,
+	onPsnLogin: () -> Unit,
+	onOpenDualSenseSpike: () -> Unit
+)
 {
 	val context = LocalContext.current
 	val scope = rememberCoroutineScope()
@@ -165,6 +172,14 @@ fun SettingsScreen(onBack: () -> Unit, onOpenRegisteredHosts: () -> Unit, onOpen
 			}
 			ClickItem(R.drawable.ic_import, R.string.preferences_import_settings_title, stringResource(R.string.preferences_import_settings_summary)) {
 				importLauncher.launch(arrayOf("application/json"))
+			}
+
+			// Solo en builds de depuración: herramientas de los SPIKE de docs/ARCHITECTURE.md.
+			if(context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0)
+			{
+				HorizontalDivider()
+				Section(R.string.developer_category_title)
+				ClickItem(R.drawable.ic_gamepad, R.string.developer_dualsense_spike_title, stringResource(R.string.developer_dualsense_spike_summary), onOpenDualSenseSpike)
 			}
 		}
 	}
