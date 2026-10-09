@@ -122,6 +122,42 @@ class DualSenseUsbTransport(context: Context)
 			finally { connection.releaseInterface(intf) }
 		}
 
+	/**
+	 * A5: reclama la interfaz (forzando) y lee reportes de entrada por el endpoint interrupt IN durante `durationMs`.
+	 * Mide cuántos llegan, su tamaño y su report id (hid-playstation: id 0x01, 64 bytes por USB).
+	 */
+	fun tryReadInput(device: UsbDevice, durationMs: Long): Attempt =
+		attempt("A5 leer input por interrupt IN", device) { connection, intf ->
+			val ep = (0 until intf.endpointCount).map { intf.getEndpoint(it) }
+				.firstOrNull { it.direction == UsbConstants.USB_DIR_IN && it.type == UsbConstants.USB_ENDPOINT_XFER_INT }
+				?: return@attempt -1 to "la interfaz HID no tiene endpoint interrupt IN"
+			if(!connection.claimInterface(intf, true))
+				return@attempt -1 to "claimInterface(force=true) falló"
+			try
+			{
+				val buffer = ByteArray(ep.maxPacketSize.coerceAtLeast(64))
+				var count = 0
+				var firstSize = 0
+				var firstId = -1
+				val ids = mutableSetOf<Int>()
+				val start = System.nanoTime()
+				while(System.nanoTime() - start < durationMs * 1_000_000)
+				{
+					val n = connection.bulkTransfer(ep, buffer, buffer.size, 100)
+					if(n > 0)
+					{
+						if(count == 0) { firstSize = n; firstId = buffer[0].toInt() and 0xff }
+						ids.add(buffer[0].toInt() and 0xff)
+						count++
+					}
+				}
+				val seconds = durationMs / 1000.0
+				count to "$count reportes en ${seconds}s (%.0f/s), primer reporte: %d bytes, id 0x%02x, ids vistos=%s, maxPacketSize=%d"
+					.format(count / seconds, firstSize, firstId, ids.joinToString { "0x%02x".format(it) }, ep.maxPacketSize)
+			}
+			finally { connection.releaseInterface(intf) }
+		}
+
 	private inline fun attempt(
 		label: String,
 		device: UsbDevice,

@@ -142,6 +142,9 @@ dependencies {
 
     implementation libs.security.crypto
 
+    // DUALPLAY SPIKE D (Bluetooth): solo para llamar a BluetoothHidHost (API oculta). Aislar/quitar si el spike no prospera.
+    implementation "org.lsposed.hiddenapibypass:hiddenapibypass:6.1"
+
     implementation libs.coroutines.android
 
     implementation libs.room.runtime

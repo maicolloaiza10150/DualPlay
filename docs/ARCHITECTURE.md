@@ -61,7 +61,7 @@ Decide la ruta de cada efecto según la conexión del control:
 
 | Efecto              | DualSense por USB-C        | DualSense por Bluetooth   | Control de terceros |
 |---------------------|----------------------------|---------------------------|---------------------|
-| Gatillos adaptativos| Sí (DualSenseUsb)          | No sin root (ver §4)      | No aplica           |
+| Gatillos adaptativos| Sí (DualSenseUsb)          | Sí (BluetoothHidHost, §4) | No aplica           |
 | Háptica HD          | SPIKE (DualSenseUsb)       | Rumble emulado            | Rumble emulado      |
 | Rumble básico       | Sí                         | Sí                        | Sí                  |
 
@@ -100,6 +100,13 @@ igual que el "emulated haptic rumble" de chiaki-ng desktop.
 - Android no permite a una app normal enviar reportes HID arbitrarios a un control conectado por Bluetooth.
   Gatillos adaptativos y háptica HD requieren cable USB-C. Investigar Shizuku/root solo como opción
   experimental y desactivada por defecto; nunca como requisito.
+- **SPIKE D (2026-10-09, S23 FE, Android 16): gatillos adaptativos por Bluetooth FUNCIONAN sin root.** Se usa
+  `BluetoothHidHost.sendData(device, hex)` (API oculta, perfil HID_HOST = 4, accesible con `hiddenapibypass`): solo exige
+  BLUETOOTH_CONNECT y que el control esté conectado como "Input device" (verificado en `HidHostService.java` de AOSP).
+  Envía el output report 0x31 (78 bytes, tag 0x10, CRC32 con semilla 0xA2) por el canal interrupt que la pila ya tiene
+  abierto, así que el input sigue llegando como InputDevice. Probado: resistencia constante notada en ambos gatillos.
+  Riesgos: API oculta (puede cambiar en futuras versiones de Android/One UI), requiere `hiddenapibypass`.
+  Esto REEMPLAZA la limitación anterior ("no sin root").
 - **SPIKE C (2026-10-08, S23 FE, Android 16): gatillos por Bluetooth clásico descartados.** Con `hiddenapibypass` la app SÍ puede
   crear `BluetoothDevice.createInsecureL2capSocket(0x11)` y la pila registra el PSM y conecta con el control (el sistema no
   bloquea el PSM). Pero la pila de Bluetooth (mainline) crea TODO socket L2CAP clásico con ERTM obligatorio

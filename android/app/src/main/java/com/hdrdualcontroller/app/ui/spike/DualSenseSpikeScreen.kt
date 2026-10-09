@@ -2,6 +2,7 @@
 
 package com.hdrdualcontroller.app.ui.spike
 
+import android.util.Log
 import android.view.InputDevice
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
@@ -63,7 +64,7 @@ fun DualSenseSpikeScreen(onBack: () -> Unit)
 		.joinToString { "${it.name} (id ${it.id}, fuentes 0x%x)".format(it.sources) }
 		.ifEmpty { "ninguno" }
 
-	fun add(line: String) { log.add(line) }
+	fun add(line: String) { log.add(line); Log.i(DualSenseUsbTransport.TAG, line) }
 	LaunchedEffect(log.size) { scroll.scrollTo(scroll.maxValue) }
 
 	fun report(): ByteArray
@@ -136,6 +137,36 @@ fun DualSenseSpikeScreen(onBack: () -> Unit)
 			OutlinedButton(onClick = { runTest { d, r -> transport.tryInterruptOutClaimed(d, r, force = true) } }, modifier = Modifier.fillMaxWidth()) {
 				Text("A3: reclamar FORZANDO + interrupt OUT")
 			}
+			OutlinedButton(onClick = {
+				withDevice { device ->
+					val data = report()
+					add("A4 inicio. Input antes: ${inputDevices()}")
+					scope.launch {
+						val result = withContext(Dispatchers.IO) { transport.tryInterruptOutClaimed(device, data, force = true) }
+						add("${if(result.ok) "OK " else "FALLO "}${result.label}: ${result.detail}")
+						val start = System.currentTimeMillis()
+						var last = ""
+						while(System.currentTimeMillis() - start < 15_000)
+						{
+							val now = inputDevices()
+							if(now != last) { add("A4 +${System.currentTimeMillis() - start}ms Input: $now"); last = now }
+							delay(250)
+						}
+						add("A4 fin. Input final: ${inputDevices()}")
+					}
+				}
+			}, modifier = Modifier.fillMaxWidth()) { Text("A4: A3 y vigilar el input 15 s") }
+			OutlinedButton(onClick = {
+				withDevice { device ->
+					add("A5 inicio. Input antes: ${inputDevices()}. Mueve sticks y pulsa botones.")
+					scope.launch {
+						val result = withContext(Dispatchers.IO) { transport.tryReadInput(device, 4000) }
+						add("${if(result.ok) "OK " else "FALLO "}${result.label}: ${result.detail}")
+						delay(800)
+						add("A5 fin. Input después: ${inputDevices()}")
+					}
+				}
+			}, modifier = Modifier.fillMaxWidth()) { Text("A5: leer reportes de entrada (4 s)") }
 			OutlinedButton(onClick = { add("Input Android ahora: ${inputDevices()}") }, modifier = Modifier.fillMaxWidth()) {
 				Text("Ver InputDevices")
 			}

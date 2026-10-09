@@ -58,4 +58,22 @@ class OutputReportBuilderTest
 		assertEquals(10, report[1 + 31].toInt())
 		assertEquals(0, report[1 + 32].toInt())
 	}
+
+	@Test
+	fun bluetoothReportLayoutAndCrc()
+	{
+		val report = OutputReportBuilder.triggerEffectsBluetooth(TriggerEffect.PULSE, TriggerEffect.CONSTANT_RESISTANCE, sequence = 3)
+		assertEquals(78, report.size)
+		assertEquals(0x31, report[0].toInt())
+		assertEquals(0x30, report[1].toInt() and 0xff) // secuencia 3 en el nibble alto
+		assertEquals(0x10, report[2].toInt())
+		assertEquals(0x0c, report[3].toInt()) // ambos gatillos
+		assertEquals(0x01, report[3 + 10].toInt()) // derecho: resistencia constante
+		assertEquals(110, report[3 + 12].toInt())
+		assertEquals(0x06, report[3 + 21].toInt()) // izquierdo: pulso
+		// CRC-32 sobre 0xA2 + los primeros 74 bytes, little-endian al final.
+		val crc = java.util.zip.CRC32().also { it.update(0xA2); it.update(report, 0, 74) }.value
+		val stored = (0 until 4).sumOf { (report[74 + it].toLong() and 0xff) shl (8 * it) }
+		assertEquals(crc, stored)
+	}
 }

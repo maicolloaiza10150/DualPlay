@@ -35,6 +35,8 @@
 
     <string name="developer_category_title">Developer</string>
     <string name="developer_dualsense_spike_title">DualSense USB spike</string>
+    <string name="developer_bluetooth_spike_title">DualSense Bluetooth spike</string>
+    <string name="developer_bluetooth_spike_summary">BluetoothHidHost.sendData via hidden API (debug builds only)</string>
     <string name="developer_dualsense_spike_summary">Trigger effects over USB-C (debug builds only)</string>
 
     <string name="preferences_bitrate_dialog_hint">Empty = automatic</string>
