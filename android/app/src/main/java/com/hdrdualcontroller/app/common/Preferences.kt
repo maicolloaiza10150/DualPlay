@@ -121,6 +121,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(hdHapticsSingleBlockKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(hdHapticsSingleBlockKey, value).apply() }
 
+	// DUALPLAY: remapeo de botones del usuario (`codigo=BOTON;...`, ver input/ButtonMapping.kt).
+	val buttonRemapKey get() = resources.getString(R.string.preferences_button_remap_key)
+	var buttonRemap: String
+		get() = sharedPreferences.getString(buttonRemapKey, "") ?: ""
+		set(value) { sharedPreferences.edit().putString(buttonRemapKey, value).apply() }
+
 	val logVerboseKey get() = resources.getString(R.string.preferences_log_verbose_key)
 	var logVerbose
 		get() = sharedPreferences.getBoolean(logVerboseKey, false)

@@ -54,6 +54,33 @@
     <string name="preferences_hd_haptics_single_title">HD haptics: small packets</string>
     <string name="preferences_hd_haptics_single_summary">Send smaller packets twice as often (less delay). Turn off if the vibration cuts out.</string>
 
+    <string name="preferences_button_remap_key">button_remap</string>
+    <string name="preferences_button_remap_title">Button mapping</string>
+    <string name="preferences_button_remap_summary">Choose which controller button does what. Works with extra buttons and paddles.</string>
+    <string name="remap_press_prompt">Press the controller button you want to use for %1$s</string>
+    <string name="remap_press_hint">Waiting for a button… (Back to cancel)</string>
+    <string name="remap_unassigned">Not assigned</string>
+    <string name="remap_reset_title">Restore defaults</string>
+    <string name="remap_reset_summary">Remove all your changes</string>
+    <string name="ps_button_cross">Cross (X)</string>
+    <string name="ps_button_moon">Circle</string>
+    <string name="ps_button_box">Square</string>
+    <string name="ps_button_pyramid">Triangle</string>
+    <string name="ps_button_l1">L1</string>
+    <string name="ps_button_r1">R1</string>
+    <string name="ps_button_l2">L2</string>
+    <string name="ps_button_r2">R2</string>
+    <string name="ps_button_l3">L3 (left stick click)</string>
+    <string name="ps_button_r3">R3 (right stick click)</string>
+    <string name="ps_button_share">Create / Share</string>
+    <string name="ps_button_options">Options</string>
+    <string name="ps_button_ps">PS button</string>
+    <string name="ps_button_touchpad">Touchpad click</string>
+    <string name="ps_button_dpad_up">D-pad up</string>
+    <string name="ps_button_dpad_down">D-pad down</string>
+    <string name="ps_button_dpad_left">D-pad left</string>
+    <string name="ps_button_dpad_right">D-pad right</string>
+
     <string name="developer_category_title">Developer</string>
     <string name="developer_dualsense_spike_title">DualSense USB spike</string>
     <string name="developer_bluetooth_spike_title">DualSense Bluetooth spike</string>

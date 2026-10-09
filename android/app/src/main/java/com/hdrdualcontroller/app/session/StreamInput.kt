@@ -8,6 +8,7 @@ import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.OnLifecycleEvent
 import com.hdrdualcontroller.app.common.Preferences
+import com.hdrdualcontroller.app.input.ButtonMapping
 import com.hdrdualcontroller.app.lib.ControllerState
 
 class StreamInput(val context: Context, val preferences: Preferences)
@@ -53,7 +54,7 @@ class StreamInput(val context: Context, val preferences: Preferences)
 			controllerStateUpdated()
 		}
 
-	private val swapCrossMoon = preferences.swapCrossMoon
+	private val buttonMapping = ButtonMapping.parse(preferences.buttonRemap, preferences.swapCrossMoon)
 
 	private val sensorEventListener = object: SensorEventListener {
 		override fun onSensorChanged(event: SensorEvent)
@@ -126,47 +127,14 @@ class StreamInput(val context: Context, val preferences: Preferences)
 		if(event.action != KeyEvent.ACTION_DOWN && event.action != KeyEvent.ACTION_UP)
 			return false
 
-		when(event.keyCode)
+		// DUALPLAY: la tecla se traduce con la tabla de remapeo (ver input/ButtonMapping.kt) en vez de un `when` fijo.
+		val target = buttonMapping.resolve(event.keyCode) ?: return false
+		val down = event.action == KeyEvent.ACTION_DOWN
+		when(target.analogTrigger)
 		{
-			KeyEvent.KEYCODE_BUTTON_L2 -> {
-				keyControllerState.l2State = if(event.action == KeyEvent.ACTION_DOWN) UByte.MAX_VALUE else 0U
-				return true
-			}
-			KeyEvent.KEYCODE_BUTTON_R2 -> {
-				keyControllerState.r2State = if(event.action == KeyEvent.ACTION_DOWN) UByte.MAX_VALUE else 0U
-				return true
-			}
-		}
-
-		val buttonMask: UInt = when(event.keyCode)
-		{
-			// dpad handled by MotionEvents
-			//KeyEvent.KEYCODE_DPAD_LEFT -> ControllerState.BUTTON_DPAD_LEFT
-			//KeyEvent.KEYCODE_DPAD_RIGHT -> ControllerState.BUTTON_DPAD_RIGHT
-			//KeyEvent.KEYCODE_DPAD_UP -> ControllerState.BUTTON_DPAD_UP
-			//KeyEvent.KEYCODE_DPAD_DOWN -> ControllerState.BUTTON_DPAD_DOWN
-			KeyEvent.KEYCODE_BUTTON_A -> if(swapCrossMoon) ControllerState.BUTTON_MOON else ControllerState.BUTTON_CROSS
-			KeyEvent.KEYCODE_BUTTON_B -> if(swapCrossMoon) ControllerState.BUTTON_CROSS else ControllerState.BUTTON_MOON
-			KeyEvent.KEYCODE_BUTTON_X -> if(swapCrossMoon) ControllerState.BUTTON_PYRAMID else ControllerState.BUTTON_BOX
-			KeyEvent.KEYCODE_BUTTON_Y -> if(swapCrossMoon) ControllerState.BUTTON_BOX else ControllerState.BUTTON_PYRAMID
-			KeyEvent.KEYCODE_BUTTON_L1 -> ControllerState.BUTTON_L1
-			KeyEvent.KEYCODE_BUTTON_R1 -> ControllerState.BUTTON_R1
-			KeyEvent.KEYCODE_BUTTON_THUMBL -> ControllerState.BUTTON_L3
-			KeyEvent.KEYCODE_BUTTON_THUMBR -> ControllerState.BUTTON_R3
-			KeyEvent.KEYCODE_BUTTON_SELECT -> ControllerState.BUTTON_SHARE
-			KeyEvent.KEYCODE_BUTTON_START -> ControllerState.BUTTON_OPTIONS
-			KeyEvent.KEYCODE_BUTTON_C -> ControllerState.BUTTON_PS
-			KeyEvent.KEYCODE_BUTTON_MODE -> ControllerState.BUTTON_PS
-			else -> return false
-		}
-
-		keyControllerState.buttons = keyControllerState.buttons.run {
-			when(event.action)
-			{
-				KeyEvent.ACTION_DOWN -> this or buttonMask
-				KeyEvent.ACTION_UP -> this and buttonMask.inv()
-				else -> this
-			}
+			1 -> keyControllerState.l2State = if(down) UByte.MAX_VALUE else 0U
+			2 -> keyControllerState.r2State = if(down) UByte.MAX_VALUE else 0U
+			else -> keyControllerState.buttons = keyControllerState.buttons.let { if(down) it or target.mask else it and target.mask.inv() }
 		}
 
 		controllerStateUpdated()

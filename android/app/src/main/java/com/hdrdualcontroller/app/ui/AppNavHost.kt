@@ -7,6 +7,7 @@ import androidx.lifecycle.viewmodel.compose.viewModel
 import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
+import com.hdrdualcontroller.app.ui.settings.ButtonMappingScreen
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.hdrdualcontroller.app.ui.main.MainScreen
@@ -28,6 +29,7 @@ private object Routes
 	const val SETTINGS = "settings"
 	const val REGISTERED_HOSTS = "settings/hosts"
 	const val LOGS = "settings/logs"
+	const val BUTTON_MAPPING = "settings/mapping"
 	const val PSN_LOGIN = "psn"
 	const val SPIKE_DUALSENSE = "spike/dualsense"
 	const val SPIKE_BLUETOOTH = "spike/bluetooth"
@@ -64,6 +66,7 @@ fun AppNavHost()
 				onBack = { navController.popBackStack() },
 				onOpenRegisteredHosts = { navController.navigate(Routes.REGISTERED_HOSTS) },
 				onOpenLogs = { navController.navigate(Routes.LOGS) },
+				onOpenButtonMapping = { navController.navigate(Routes.BUTTON_MAPPING) },
 				onPsnLogin = { navController.navigate(Routes.PSN_LOGIN) },
 				onOpenDualSenseSpike = { navController.navigate(Routes.SPIKE_DUALSENSE) },
 				onOpenBluetoothSpike = { navController.navigate(Routes.SPIKE_BLUETOOTH) })
@@ -81,6 +84,10 @@ fun AppNavHost()
 			RegisteredHostsScreen(
 				onBack = { navController.popBackStack() },
 				onRegister = { openRegist(null, null) })
+		}
+
+		composable(Routes.BUTTON_MAPPING) {
+			ButtonMappingScreen(onBack = { navController.popBackStack() })
 		}
 
 		composable(Routes.LOGS) {

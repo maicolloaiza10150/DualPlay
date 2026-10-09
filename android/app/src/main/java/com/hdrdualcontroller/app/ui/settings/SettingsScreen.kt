@@ -70,6 +70,7 @@ fun SettingsScreen(
 	onBack: () -> Unit,
 	onOpenRegisteredHosts: () -> Unit,
 	onOpenLogs: () -> Unit,
+	onOpenButtonMapping: () -> Unit,
 	onPsnLogin: () -> Unit,
 	onOpenDualSenseSpike: () -> Unit,
 	onOpenBluetoothSpike: () -> Unit
@@ -164,6 +165,7 @@ fun SettingsScreen(
 			SwitchItem(R.drawable.ic_gamepad, R.string.preferences_swap_cross_moon_title, R.string.preferences_swap_cross_moon_summary, swapCrossMoon) {
 				swapCrossMoon = it; prefs.swapCrossMoon = it
 			}
+			ClickItem(R.drawable.ic_gamepad, R.string.preferences_button_remap_title, stringResource(R.string.preferences_button_remap_summary), onOpenButtonMapping)
 			SwitchItem(R.drawable.ic_rumble, R.string.preferences_rumble_enabled_title, R.string.preferences_rumble_enabled_summary, rumble) {
 				rumble = it; prefs.rumbleEnabled = it
 			}
