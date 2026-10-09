@@ -61,12 +61,17 @@ object OutputReportBuilder
 
 	// Offsets dentro del bloque común (SDL DS5EffectsState_t / hid-playstation dualsense_output_report_common).
 	const val OFFSET_ENABLE_BITS_1 = 0
+	const val OFFSET_MOTOR_RIGHT = 2
+	const val OFFSET_MOTOR_LEFT = 3
+	const val OFFSET_ENABLE_BITS_3 = 38 // hid-playstation: valid_flag2
 	const val OFFSET_RIGHT_TRIGGER = 10
 	const val OFFSET_LEFT_TRIGGER = 21
 	const val TRIGGER_EFFECT_SIZE = 11
 
 	const val ENABLE_RIGHT_TRIGGER = 0x04
 	const val ENABLE_LEFT_TRIGGER = 0x08
+	const val ENABLE_HAPTICS_SELECT = 0x02
+	const val ENABLE_COMPATIBLE_VIBRATION_2 = 0x04
 
 	const val REPORT_ID_BT = 0x31
 	const val BT_REPORT_SIZE = 78
@@ -83,13 +88,31 @@ object OutputReportBuilder
 	}
 
 	/** Versión Bluetooth: 78 bytes con tag y CRC. `sequence` es el contador de 4 bits de hid-playstation. */
-	fun triggerEffectsBluetooth(left: TriggerEffect?, right: TriggerEffect?, sequence: Int = 0): ByteArray
+	fun triggerEffectsBluetooth(left: TriggerEffect?, right: TriggerEffect?, sequence: Int = 0): ByteArray =
+		outputBluetooth(left, right, rumble = null, sequence = sequence)
+
+	/**
+	 * Reporte Bluetooth con gatillos y/o rumble. `rumble` (0..255) activa el rumble emulado "compatible" de los DualSense
+	 * con firmware >= 0x0224 (todos los actuales): SDL/chiaki-ng `SetDualSenseRumble` pone `ucEnableBits1 |= 0x02`
+	 * (HAPTICS_SELECT, rumble en vez de háptica de audio) y `ucEnableBits3 |= 0x04` (COMPATIBLE_VIBRATION2), con los
+	 * motores en los offsets 2 (derecho) y 3 (izquierdo); hid-playstation hace lo mismo con `use_vibration_v2`.
+	 * Los DualSense con firmware anterior usarían `ucEnableBits1 |= 0x01` y la mitad de fuerza; no se soportan.
+	 */
+	fun outputBluetooth(left: TriggerEffect?, right: TriggerEffect?, rumble: Int?, sequence: Int = 0): ByteArray
 	{
 		val report = ByteArray(BT_REPORT_SIZE)
 		report[0] = REPORT_ID_BT.toByte()
 		report[1] = ((sequence and 0x0f) shl 4).toByte()
 		report[2] = BT_TAG.toByte()
 		fillTriggers(report, 3, left, right)
+		if(rumble != null)
+		{
+			val strength = rumble.coerceIn(0, 255).toByte()
+			report[3 + OFFSET_ENABLE_BITS_1] = (report[3 + OFFSET_ENABLE_BITS_1].toInt() or ENABLE_HAPTICS_SELECT).toByte()
+			report[3 + OFFSET_MOTOR_RIGHT] = strength
+			report[3 + OFFSET_MOTOR_LEFT] = strength
+			report[3 + OFFSET_ENABLE_BITS_3] = ENABLE_COMPATIBLE_VIBRATION_2.toByte()
+		}
 		val crc = java.util.zip.CRC32()
 		crc.update(BT_CRC_SEED)
 		crc.update(report, 0, BT_REPORT_SIZE - 4)

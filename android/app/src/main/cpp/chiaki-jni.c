@@ -135,6 +135,11 @@ typedef struct android_chiaki_session_t
 	jmethodID java_session_event_quit_meth;
 	jmethodID java_session_event_rumble_meth;
 	jmethodID java_session_event_trigger_effects_meth; // DUALPLAY
+	jmethodID java_session_event_haptic_rumble_meth; // DUALPLAY
+	// DUALPLAY: rumble emulado desde la háptica de la PS5 (se promedian 3 paquetes de 10 ms, como chiaki-ng de escritorio)
+	uint32_t haptic_sum;
+	int haptic_count;
+	bool haptic_on;
 	jfieldID java_controller_state_buttons;
 	jfieldID java_controller_state_l2_state;
 	jfieldID java_controller_state_r2_state;
@@ -161,6 +166,57 @@ typedef struct android_chiaki_session_t
 	AndroidChiakiAudioDecoder audio_decoder;
 	void *audio_output;
 } AndroidChiakiSession;
+
+// DUALPLAY: constantes de gui/src/streamsession.cpp (HAPTIC_RUMBLE_MIN_STRENGTH, RUMBLE_HAPTICS_PACKETS_PER_RUMBLE)
+#define HAPTIC_RUMBLE_MIN_STRENGTH 100
+#define HAPTIC_RUMBLE_PACKETS_PER_RUMBLE 3
+
+/**
+ * DUALPLAY: háptica de la PS5 (PCM estéreo int16) -> fuerza de rumble de 16 bits. Port de StreamSession::PushHapticsFrame
+ * (modo "Normal") de chiaki-ng. Solo se llama a Java cada 3 paquetes y cuando cambia entre silencio/sonido.
+ */
+static void android_chiaki_haptics_frame_cb(uint8_t *buf, size_t buf_size, void *user)
+{
+	AndroidChiakiSession *session = user;
+	const size_t sample_size = 2 * sizeof(int16_t);
+	if(buf_size == 0 || (buf_size % sample_size) != 0)
+		return;
+	size_t count = buf_size / sample_size;
+	uint32_t sum_left = 0, sum_right = 0;
+	for(size_t i = 0; i < count; i++)
+	{
+		int16_t left, right;
+		memcpy(&left, buf + i * sample_size, sizeof(int16_t));
+		memcpy(&right, buf + i * sample_size + sizeof(int16_t), sizeof(int16_t));
+		sum_left += (uint32_t)(left < 0 ? -(int32_t)left : left) * 2;
+		sum_right += (uint32_t)(right < 0 ? -(int32_t)right : right) * 2;
+	}
+	uint32_t left = sum_left / count;
+	uint32_t right = sum_right / count;
+	left = left > HAPTIC_RUMBLE_MIN_STRENGTH ? left : 0;
+	right = right > HAPTIC_RUMBLE_MIN_STRENGTH ? right : 0;
+	uint32_t strength = left > right ? left : right;
+	if(strength > UINT16_MAX)
+		strength = UINT16_MAX;
+	if(strength > 0 && strength < (1 << 9))
+		strength = 1 << 9; // mínimo para mandos que desplazan 9 bits al vibrar
+
+	session->haptic_sum += strength;
+	if(++session->haptic_count < HAPTIC_RUMBLE_PACKETS_PER_RUMBLE)
+		return;
+	uint32_t average = session->haptic_sum / HAPTIC_RUMBLE_PACKETS_PER_RUMBLE;
+	session->haptic_sum = 0;
+	session->haptic_count = 0;
+	if(average == 0 && !session->haptic_on)
+		return; // sigue en silencio: no hace falta avisar
+	session->haptic_on = average > 0;
+
+	JNIEnv *env = attach_thread_jni();
+	if(!env)
+		return;
+	E->CallVoidMethod(env, session->java_session, session->java_session_event_haptic_rumble_meth, (jint)average);
+	(*global_vm)->DetachCurrentThread(global_vm);
+}
 
 static void android_chiaki_event_cb(ChiakiEvent *event, void *user)
 {
@@ -350,6 +406,10 @@ JNIEXPORT void JNICALL JNI_FCN(sessionCreate)(JNIEnv *env, jobject obj, jobject 
 	session->java_session_event_quit_meth = E->GetMethodID(env, session->java_session_class, "eventQuit", "(ILjava/lang/String;)V");
 	session->java_session_event_rumble_meth = E->GetMethodID(env, session->java_session_class, "eventRumble", "(II)V");
 	session->java_session_event_trigger_effects_meth = E->GetMethodID(env, session->java_session_class, "eventTriggerEffects", "(II[B[B)V"); // DUALPLAY
+	session->java_session_event_haptic_rumble_meth = E->GetMethodID(env, session->java_session_class, "eventHapticRumble", "(I)V"); // DUALPLAY
+	session->haptic_sum = 0;
+	session->haptic_count = 0;
+	session->haptic_on = false;
 
 	jclass controller_state_class = E->FindClass(env, BASE_PACKAGE"/ControllerState");
 	session->java_controller_state_buttons = E->GetFieldID(env, controller_state_class, "buttons", "I");
@@ -382,6 +442,15 @@ JNIEXPORT void JNICALL JNI_FCN(sessionCreate)(JNIEnv *env, jobject obj, jobject 
 	ChiakiAudioSink audio_sink;
 	android_chiaki_audio_decoder_get_sink(&session->audio_decoder, &audio_sink);
 	chiaki_session_set_audio_sink(&session->session, &audio_sink);
+
+	if(connect_info.enable_dualsense)
+	{
+		// DUALPLAY: en modo DualSense la PS5 manda el rumble como háptica (audio); sin sumidero se perdería.
+		ChiakiAudioSink haptics_sink = { 0 };
+		haptics_sink.user = session;
+		haptics_sink.frame_cb = android_chiaki_haptics_frame_cb;
+		chiaki_session_set_haptics_sink(&session->session, &haptics_sink);
+	}
 
 beach:
 	if(!session && log)

@@ -76,4 +76,36 @@ class OutputReportBuilderTest
 		val stored = (0 until 4).sumOf { (report[74 + it].toLong() and 0xff) shl (8 * it) }
 		assertEquals(crc, stored)
 	}
+
+	@Test
+	fun rumbleSetsMotorsAndFlags()
+	{
+		val report = OutputReportBuilder.outputBluetooth(null, null, rumble = 200, sequence = 0)
+		assertEquals(0x02, report[3].toInt()) // HAPTICS_SELECT, sin bits de gatillo
+		assertEquals(200, report[3 + 2].toInt() and 0xff) // motor derecho
+		assertEquals(200, report[3 + 3].toInt() and 0xff) // motor izquierdo
+		assertEquals(0x04, report[3 + 38].toInt()) // COMPATIBLE_VIBRATION2
+		val crc = java.util.zip.CRC32().also { it.update(0xA2); it.update(report, 0, 74) }.value
+		val stored = (0 until 4).sumOf { (report[74 + it].toLong() and 0xff) shl (8 * it) }
+		assertEquals(crc, stored)
+	}
+
+	@Test
+	fun rumbleAndTriggersShareOneReport()
+	{
+		val report = OutputReportBuilder.outputBluetooth(TriggerEffect.PULSE, TriggerEffect.CONSTANT_RESISTANCE, rumble = 255)
+		assertEquals(0x0e, report[3].toInt()) // triggers 0x0c | haptics select 0x02
+		assertEquals(0x01, report[3 + 10].toInt())
+		assertEquals(0x06, report[3 + 21].toInt())
+		assertEquals(255, report[3 + 2].toInt() and 0xff)
+	}
+
+	@Test
+	fun noRumbleLeavesMotorsUntouched()
+	{
+		val report = OutputReportBuilder.outputBluetooth(TriggerEffect.CLEAR, TriggerEffect.CLEAR, rumble = null)
+		assertEquals(0, report[3 + 2].toInt())
+		assertEquals(0, report[3 + 38].toInt())
+		assertEquals(0x0c, report[3].toInt())
+	}
 }

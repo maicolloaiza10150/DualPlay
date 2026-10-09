@@ -12,50 +12,63 @@ import java.util.concurrent.atomic.AtomicReference
 class TriggerEffects(val left: TriggerEffect, val right: TriggerEffect)
 
 /**
- * Parte "gatillos" del FeedbackRouter (docs/ARCHITECTURE.md 2.5): recibe los efectos de la sesión y los manda al
- * DualSense por Bluetooth. El último estado gana (fusión) y hay un intervalo mínimo entre envíos para no saturar el
- * enlace; al cerrar se apagan los gatillos (modo 0x05), porque el control conserva el último efecto.
+ * Salida hacia el DualSense por Bluetooth (FeedbackRouter, docs/ARCHITECTURE.md 2.5): gatillos adaptativos y rumble
+ * emulado a partir de la háptica de la PS5. Los dos viajan en el mismo output report 0x31 con banderas de validez
+ * independientes, así que se fusionan: de cada uno gana el último valor y se envía como mucho un reporte cada
+ * `MIN_INTERVAL_MS`. Al cerrar se apagan gatillos y motores, porque el control conserva el último estado.
  */
 class TriggerFeedback(context: Context)
 {
+	/** Cambios pendientes de enviar; `null` = sin cambios en ese campo. */
+	private class Pending(val triggers: TriggerEffects?, val rumble: Int?)
+
 	private val sender = DualSenseBluetoothSender(context)
-	private val executor = Executors.newSingleThreadExecutor { Thread(it, "DualSenseTriggers").also { t -> t.isDaemon = true } }
-	private val pending = AtomicReference<TriggerEffects?>(null)
+	private val executor = Executors.newSingleThreadExecutor { Thread(it, "DualSenseOutput").also { t -> t.isDaemon = true } }
+	private val pending = AtomicReference<Pending?>(null)
 	private var sequence = 0
 	private var opened = false
 
 	init
 	{
-		executor.execute { opened = sender.open(); if(!opened) Log.w(TAG, "Los efectos de gatillo se ignorarán en esta sesión") }
+		executor.execute { opened = sender.open(); if(!opened) Log.w(TAG, "Los efectos del DualSense se ignorarán en esta sesión") }
 	}
 
 	/** Llamar desde cualquier hilo; no bloquea. */
 	fun onTriggerEffects(effects: TriggerEffects)
 	{
-		pending.set(effects)
+		pending.updateAndGet { Pending(effects, it?.rumble) }
+		executor.execute { drain() }
+	}
+
+	/** `strength` 0..255 (la háptica llega con 16 bits: se pasa `>> 8`, como `SetHapticRumble` del escritorio). */
+	fun onRumble(strength: Int)
+	{
+		pending.updateAndGet { Pending(it?.triggers, strength) }
 		executor.execute { drain() }
 	}
 
 	private fun drain()
 	{
-		val effects = pending.getAndSet(null) ?: return
+		val change = pending.getAndSet(null) ?: return
 		if(!opened || !sender.available)
 			return
 		val device = sender.connectedController() ?: return
-		val report = OutputReportBuilder.triggerEffectsBluetooth(effects.left, effects.right, sequence)
+		val report = OutputReportBuilder.outputBluetooth(change.triggers?.left, change.triggers?.right, change.rumble, sequence)
 		sequence = (sequence + 1) and 0x0f
 		sender.send(device, report)
-		// Mientras duerme, nuevos eventos sobrescriben `pending`: solo se envía el más reciente.
+		// Mientras duerme, los eventos nuevos sobrescriben `pending`: solo se envía lo más reciente.
 		try { Thread.sleep(MIN_INTERVAL_MS) } catch(_: InterruptedException) {}
 	}
 
-	/** Apaga los gatillos y libera el perfil Bluetooth. Bloquea unos instantes como máximo. */
+	/** Apaga gatillos y motores y libera el perfil Bluetooth. Bloquea un instante como máximo. */
 	fun clearAndClose()
 	{
 		pending.set(null)
 		executor.execute {
 			if(opened && sender.available)
-				sender.connectedController()?.let { sender.send(it, OutputReportBuilder.triggerEffectsBluetooth(TriggerEffect.CLEAR, TriggerEffect.CLEAR, sequence)) }
+				sender.connectedController()?.let {
+					sender.send(it, OutputReportBuilder.outputBluetooth(TriggerEffect.CLEAR, TriggerEffect.CLEAR, rumble = 0, sequence = sequence))
+				}
 			sender.close()
 		}
 		executor.shutdown()

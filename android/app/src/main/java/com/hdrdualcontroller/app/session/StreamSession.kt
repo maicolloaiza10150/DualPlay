@@ -26,6 +26,7 @@ class StreamSession(val context: Context, val connectInfo: ConnectInfo, val logM
 {
 	// DUALPLAY: efectos de gatillo hacia el DualSense (solo si se activó en Ajustes).
 	private var triggerFeedback: TriggerFeedback? = null
+	private var hapticLogged = false
 
 	var session: Session? = null
 		private set
@@ -101,6 +102,15 @@ class StreamSession(val context: Context, val connectInfo: ConnectInfo, val logM
 				)
 			)
 			is RumbleEvent -> _rumbleState.postValue(event)
+			is HapticRumbleEvent ->
+			{
+				if(!hapticLogged)
+				{
+					hapticLogged = true
+					Log.i("DualPlay", "Háptica de la PS5 recibida (primer rumble emulado, fuerza ${event.strength}/65535)")
+				}
+				triggerFeedback?.onRumble(event.strength shr 8)
+			}
 			is TriggerEffectsEvent -> {
 				Log.i("DualPlay", "Efectos de gatillo de la PS5: izq=0x%02x der=0x%02x (feedback ${if(triggerFeedback != null) "activo" else "desactivado"})".format(event.typeLeft, event.typeRight))
 				triggerFeedback?.onTriggerEffects(

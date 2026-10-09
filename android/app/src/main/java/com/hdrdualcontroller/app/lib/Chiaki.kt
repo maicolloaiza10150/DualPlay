@@ -320,6 +320,8 @@ data class LoginPinRequestEvent(val pinIncorrect: Boolean): Event()
 data class QuitEvent(val reason: QuitReason, val reasonString: String?): Event()
 data class RumbleEvent(val left: UByte, val right: UByte): Event()
 // DUALPLAY: tipo + 10 bytes por gatillo, tal cual los manda la PS5.
+// DUALPLAY: fuerza de rumble (0..65535) derivada de la háptica de la PS5 en modo DualSense.
+class HapticRumbleEvent(val strength: Int): Event()
 class TriggerEffectsEvent(val typeLeft: Int, val typeRight: Int, val left: ByteArray, val right: ByteArray): Event()
 
 class CreateError(val errorCode: ErrorCode): Exception("Failed to create a native object: $errorCode")
@@ -379,6 +381,11 @@ class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean)
 	private fun eventRumble(left: Int, right: Int)
 	{
 		event(RumbleEvent(left.toUByte(), right.toUByte()))
+	}
+
+	private fun eventHapticRumble(strength: Int)
+	{
+		event(HapticRumbleEvent(strength))
 	}
 
 	private fun eventTriggerEffects(typeLeft: Int, typeRight: Int, left: ByteArray, right: ByteArray)
