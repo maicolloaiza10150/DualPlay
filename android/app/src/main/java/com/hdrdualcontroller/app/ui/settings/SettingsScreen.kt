@@ -88,6 +88,8 @@ fun SettingsScreen(
 	var logVerbose by remember { mutableStateOf(prefs.logVerbose) }
 	var dualsenseFeatures by remember { mutableStateOf(prefs.dualsenseFeatures) }
 	var hdHaptics by remember { mutableStateOf(prefs.hdHaptics) }
+	var hdGain by remember { mutableStateOf(prefs.hdHapticsGainPercent) }
+	var showHdGain by remember { mutableStateOf(false) }
 	var resolution by remember { mutableStateOf(prefs.resolution) }
 	var fps by remember { mutableStateOf(prefs.fps) }
 	var codec by remember { mutableStateOf(prefs.codec) }
@@ -185,6 +187,7 @@ fun SettingsScreen(
 			SwitchItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_title, R.string.preferences_hd_haptics_summary, hdHaptics) {
 				hdHaptics = it; prefs.hdHaptics = it
 			}
+			ClickItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_gain_title, stringResource(R.string.preferences_hd_haptics_gain_value, hdGain)) { showHdGain = true }
 			SwitchItem(R.drawable.ic_log, R.string.preferences_log_verbose_title, R.string.preferences_log_verbose_summary, logVerbose) {
 				logVerbose = it; prefs.logVerbose = it
 			}
@@ -232,6 +235,10 @@ fun SettingsScreen(
 		ChoiceDialog(
 			R.string.preferences_codec_title, Preferences.codecAll.toList(), codec,
 			{ stringResource(it.title) }, { showCodec = false }) { codec = it; prefs.codec = it }
+	if(showHdGain)
+		ChoiceDialog(
+			R.string.preferences_hd_haptics_gain_title, listOf(50, 100, 150, 200, 300, 400), hdGain,
+			{ stringResource(R.string.preferences_hd_haptics_gain_value, it) }, { showHdGain = false }) { hdGain = it; prefs.hdHapticsGainPercent = it }
 	if(showBitrate)
 		BitrateDialog(bitrate, bitrateAuto, { showBitrate = false }) {
 			prefs.bitrate = it

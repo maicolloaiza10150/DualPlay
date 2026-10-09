@@ -103,6 +103,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(hdHapticsKey, false)
 		set(value) { sharedPreferences.edit().putBoolean(hdHapticsKey, value).apply() }
 
+	// DUALPLAY: fuerza de la háptica HD en % (100 = señal tal cual de la PS5).
+	val hdHapticsGainKey get() = resources.getString(R.string.preferences_hd_haptics_gain_key)
+	var hdHapticsGainPercent
+		get() = sharedPreferences.getInt(hdHapticsGainKey, 100).coerceIn(50, 400)
+		set(value) { sharedPreferences.edit().putInt(hdHapticsGainKey, value.coerceIn(50, 400)).apply() }
+
 	val logVerboseKey get() = resources.getString(R.string.preferences_log_verbose_key)
 	var logVerbose
 		get() = sharedPreferences.getBoolean(logVerboseKey, false)

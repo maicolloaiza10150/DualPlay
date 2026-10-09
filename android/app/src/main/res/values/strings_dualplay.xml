@@ -42,6 +42,10 @@
     <string name="preferences_hd_haptics_title">HD haptics (experimental)</string>
     <string name="preferences_hd_haptics_summary">Send the real haptic signal of the game to the DualSense over Bluetooth instead of a simple rumble. Needs adaptive triggers enabled.</string>
 
+    <string name="preferences_hd_haptics_gain_key">hd_haptics_gain</string>
+    <string name="preferences_hd_haptics_gain_title">HD haptics strength</string>
+    <string name="preferences_hd_haptics_gain_value">%d%%</string>
+
     <string name="developer_category_title">Developer</string>
     <string name="developer_dualsense_spike_title">DualSense USB spike</string>
     <string name="developer_bluetooth_spike_title">DualSense Bluetooth spike</string>

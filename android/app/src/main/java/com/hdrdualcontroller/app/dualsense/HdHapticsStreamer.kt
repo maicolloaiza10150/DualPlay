@@ -17,7 +17,9 @@ import java.util.concurrent.locks.LockSupport
  */
 class HdHapticsStreamer(
 	private val sender: DualSenseBluetoothSender,
-	private val nextSequence: () -> Int
+	private val nextSequence: () -> Int,
+	/** Multiplicador de la señal (1.0 = tal cual llega de la PS5). Se satura en int8. */
+	private val gain: Float = 1f
 )
 {
 	private val lock = Any()
@@ -27,6 +29,14 @@ class HdHapticsStreamer(
 	private var count = 0 // en muestras
 	@Volatile private var running = true
 	private var packetCounter = 0
+
+	// Estadísticas para afinar (se vuelcan al log cada STATS_PERIOD_NS).
+	private var statFrames = 0
+	private var statDropped = 0
+	private var statUnderruns = 0
+	private var statPeak = 0 // |muestra int16| máxima
+	private var statSumSquares = 0.0
+	private var statSamples = 0L
 	private val thread = Thread(::run, "DualSenseHaptics").also { it.isDaemon = true; it.start() }
 
 	/** Hilo de red de la sesión: no bloquea. `pcm` = estéreo int16 LE. */
@@ -36,6 +46,7 @@ class HdHapticsStreamer(
 			return
 		synchronized(lock)
 		{
+			statFrames++
 			var i = 0
 			while(i + 3 < pcm.size)
 			{
@@ -43,6 +54,7 @@ class HdHapticsStreamer(
 				{
 					head = (head + 1) % RING_SAMPLES
 					count--
+					statDropped++
 				}
 				val tail = (head + count) % RING_SAMPLES
 				ring[tail * 2] = toInt8(pcm[i], pcm[i + 1])
@@ -60,7 +72,16 @@ class HdHapticsStreamer(
 		try { thread.join(500) } catch(_: InterruptedException) {}
 	}
 
-	private fun toInt8(lo: Byte, hi: Byte): Byte = hi // int16 little-endian >> 8 = el byte alto
+	/** int16 little-endian -> int8 (`>> 8`) con ganancia y saturación; actualiza las estadísticas de nivel. */
+	private fun toInt8(lo: Byte, hi: Byte): Byte
+	{
+		val sample = ((hi.toInt() shl 8) or (lo.toInt() and 0xff)) // ya con signo
+		val abs = if(sample < 0) -sample else sample
+		if(abs > statPeak) statPeak = abs
+		statSumSquares += sample.toDouble() * sample
+		statSamples++
+		return Math.round(sample * gain / 256f).coerceIn(-128, 127).toByte()
+	}
 
 	private fun run()
 	{
@@ -70,9 +91,15 @@ class HdHapticsStreamer(
 		var primed = false
 		val block = ByteArray(OutputReportBuilder.HAPTICS_BLOCK_BYTES)
 		var sent = 0L
+		var statsAt = System.nanoTime()
 		while(running)
 		{
 			val now = System.nanoTime()
+			if(now - statsAt >= STATS_PERIOD_NS)
+			{
+				statsAt = now
+				logStats(sent)
+			}
 			val buffered = synchronized(lock) { count }
 			if(!primed)
 			{
@@ -108,6 +135,7 @@ class HdHapticsStreamer(
 			if(!enough)
 			{
 				primed = false // se vació: se vuelve a llenar el colchón
+				synchronized(lock) { statUnderruns++ }
 				continue
 			}
 			if(device == null || now - deviceCheckedAt > 1_000_000_000L)
@@ -128,8 +156,27 @@ class HdHapticsStreamer(
 		Log.i(TAG, "Háptica HD: $sent reportes enviados")
 	}
 
+	private fun logStats(sent: Long)
+	{
+		val frames: Int
+		val dropped: Int
+		val underruns: Int
+		val peak: Int
+		val rms: Double
+		synchronized(lock)
+		{
+			frames = statFrames; dropped = statDropped; underruns = statUnderruns; peak = statPeak
+			rms = if(statSamples > 0) Math.sqrt(statSumSquares / statSamples) else 0.0
+			statFrames = 0; statDropped = 0; statUnderruns = 0; statPeak = 0; statSumSquares = 0.0; statSamples = 0
+		}
+		// Nivel en % de plena escala int16 (32768): pico y RMS de la háptica que llega de la PS5.
+		Log.i(TAG, "Háptica HD [5 s]: frames=$frames reportes=$sent muestrasPerdidas=$dropped vaciados=$underruns " +
+			"pico=%.1f%% rms=%.1f%% ganancia=%.2f".format(peak * 100.0 / 32768, rms * 100.0 / 32768, gain))
+	}
+
 	private companion object
 	{
+		const val STATS_PERIOD_NS = 5_000_000_000L
 		const val TAG = "DualPlay"
 		const val BLOCK_SAMPLES = 64 // por reporte (2 x 32)
 		const val PRIME_SAMPLES = 96 // colchón inicial: un bloque y medio

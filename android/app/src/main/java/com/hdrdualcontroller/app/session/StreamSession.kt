@@ -9,6 +9,7 @@ import android.view.*
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.hdrdualcontroller.app.common.LogManager
+import com.hdrdualcontroller.app.common.Preferences
 import com.hdrdualcontroller.app.dualsense.TriggerEffect
 import com.hdrdualcontroller.app.dualsense.TriggerEffects
 import com.hdrdualcontroller.app.dualsense.TriggerFeedback
@@ -72,7 +73,7 @@ class StreamSession(val context: Context, val connectInfo: ConnectInfo, val logM
 			_state.value = StreamStateConnecting
 			session.eventCallback = this::eventCallback
 			if(connectInfo.enableDualSense && triggerFeedback == null)
-				triggerFeedback = TriggerFeedback(context, connectInfo.enableHdHaptics)
+				triggerFeedback = TriggerFeedback(context, connectInfo.enableHdHaptics, Preferences(context).hdHapticsGainPercent / 100f)
 			session.start()
 			val surface = surface
 			if(surface != null)
