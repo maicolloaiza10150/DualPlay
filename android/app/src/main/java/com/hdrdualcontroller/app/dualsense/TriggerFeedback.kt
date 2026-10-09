@@ -17,7 +17,12 @@ class TriggerEffects(val left: TriggerEffect, val right: TriggerEffect)
  * independientes, así que se fusionan: de cada uno gana el último valor y se envía como mucho un reporte cada
  * `MIN_INTERVAL_MS`. Al cerrar se apagan gatillos y motores, porque el control conserva el último estado.
  */
-class TriggerFeedback(context: Context, hdHaptics: Boolean = false, private val hdGain: Float = 1f)
+class TriggerFeedback(
+	context: Context,
+	hdHaptics: Boolean = false,
+	private val hdGain: Float = 1f,
+	private val hdControllerBuffer: Int = OutputReportBuilder.HAPTICS_BUFFER_LENGTH
+)
 {
 	/** Cambios pendientes de enviar; `null` = sin cambios en ese campo. */
 	private class Pending(val triggers: TriggerEffects?, val rumble: Int?)
@@ -34,7 +39,7 @@ class TriggerFeedback(context: Context, hdHaptics: Boolean = false, private val 
 		executor.execute {
 			opened = sender.open()
 			if(opened && useHdHaptics)
-				hdStreamer = HdHapticsStreamer(sender, sender::nextSequence, hdGain)
+				hdStreamer = HdHapticsStreamer(sender, sender::nextSequence, hdGain, hdControllerBuffer)
 			if(!opened)
 				Log.w(TAG, "Los efectos del DualSense se ignorarán en esta sesión")
 		}

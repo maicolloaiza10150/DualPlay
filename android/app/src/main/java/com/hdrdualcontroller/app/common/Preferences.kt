@@ -109,6 +109,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getInt(hdHapticsGainKey, 100).coerceIn(50, 400)
 		set(value) { sharedPreferences.edit().putInt(hdHapticsGainKey, value.coerceIn(50, 400)).apply() }
 
+	// DUALPLAY: búfer interno de háptica del control (16..127). Menos = menos retraso, más riesgo de cortes.
+	val hdHapticsBufferKey get() = resources.getString(R.string.preferences_hd_haptics_buffer_key)
+	var hdHapticsBuffer
+		get() = sharedPreferences.getInt(hdHapticsBufferKey, 32).coerceIn(16, 127)
+		set(value) { sharedPreferences.edit().putInt(hdHapticsBufferKey, value.coerceIn(16, 127)).apply() }
+
 	val logVerboseKey get() = resources.getString(R.string.preferences_log_verbose_key)
 	var logVerbose
 		get() = sharedPreferences.getBoolean(logVerboseKey, false)

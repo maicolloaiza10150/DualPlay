@@ -46,6 +46,10 @@
     <string name="preferences_hd_haptics_gain_title">HD haptics strength</string>
     <string name="preferences_hd_haptics_gain_value">%d%%</string>
 
+    <string name="preferences_hd_haptics_buffer_key">hd_haptics_buffer</string>
+    <string name="preferences_hd_haptics_buffer_title">HD haptics delay</string>
+    <string name="preferences_hd_haptics_buffer_value">%d (lower = less delay, may cut out)</string>
+
     <string name="developer_category_title">Developer</string>
     <string name="developer_dualsense_spike_title">DualSense USB spike</string>
     <string name="developer_bluetooth_spike_title">DualSense Bluetooth spike</string>
