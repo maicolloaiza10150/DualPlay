@@ -61,6 +61,9 @@ object OutputReportBuilder
 
 	// Offsets dentro del bloque común (SDL DS5EffectsState_t / hid-playstation dualsense_output_report_common).
 	const val OFFSET_ENABLE_BITS_1 = 0
+	const val OFFSET_ENABLE_BITS_2 = 1
+	const val ENABLE_HAPTIC_LOW_PASS = 0x20
+	const val ENABLE_MOTOR_POWER = 0x40
 	const val OFFSET_MOTOR_RIGHT = 2
 	const val OFFSET_MOTOR_LEFT = 3
 	const val OFFSET_ENABLE_BITS_3 = 38 // hid-playstation: valid_flag2
@@ -79,6 +82,9 @@ object OutputReportBuilder
 	const val BT_CRC_SEED = 0xA2
 	const val REPORT_ID_HAPTICS = 0x39
 	const val HAPTICS_REPORT_SIZE = 547
+	const val REPORT_ID_HAPTICS_SINGLE = 0x32
+	const val HAPTICS_SINGLE_REPORT_SIZE = 142
+	const val HAPTICS_SINGLE_BLOCK_BYTES = 64
 	const val HAPTICS_BLOCK_BYTES = 128
 	const val HAPTICS_BUFFER_LENGTH = 48 // valor por defecto de DS5Dongle (rango 16..127)
 	const val HAPTICS_SAMPLE_RATE = 3000
@@ -155,6 +161,64 @@ object OutputReportBuilder
 		val value = crc.value
 		for(i in 0 until 4)
 			report[HAPTICS_REPORT_SIZE - 4 + i] = ((value shr (8 * i)) and 0xff).toByte()
+		return report
+	}
+
+	/**
+	 * Reporte Bluetooth 0x32 (142 bytes) con UN bloque de háptica: 32 muestras estéreo int8 a 3000 Hz = 64 bytes (~10,7 ms),
+	 * un reporte cada ~10,7 ms. Es el formato de SAxense (github.com/egormanga/SAxense, POC original) y de AnyPS5
+	 * (github.com/boykopovar/AnyPS5, issue #2056): [0]=0x32, [1]=seq<<4, [2..4]=0x91 0x07 0xFE (paquete de control, 7 bytes),
+	 * [5..9]=profundidad de cola del control, [10]=contador, [11..12]=0x92 0x40 (paquete de 64 bytes), [13..76]=muestras,
+	 * resto a cero y CRC32 (semilla 0xA2) en los últimos 4 bytes. Reportes más pequeños y el doble de cadencia que 0x39.
+	 */
+	fun hapticsBluetoothSingle(block: ByteArray, sequence: Int, packetCounter: Int, bufferLength: Int = HAPTICS_BUFFER_LENGTH): ByteArray
+	{
+		require(block.size == HAPTICS_SINGLE_BLOCK_BYTES) { "El bloque de háptica son $HAPTICS_SINGLE_BLOCK_BYTES bytes (32 muestras estéreo)" }
+		val report = ByteArray(HAPTICS_SINGLE_REPORT_SIZE)
+		report[0] = REPORT_ID_HAPTICS_SINGLE.toByte()
+		report[1] = ((sequence and 0x0f) shl 4).toByte()
+		report[2] = 0x91.toByte()
+		report[3] = 7
+		report[4] = 0xFE.toByte()
+		for(i in 5..9) report[i] = bufferLength.toByte()
+		report[10] = packetCounter.toByte()
+		report[11] = 0x92.toByte()
+		report[12] = 64
+		block.copyInto(report, 13)
+		val crc = java.util.zip.CRC32()
+		crc.update(BT_CRC_SEED)
+		crc.update(report, 0, HAPTICS_SINGLE_REPORT_SIZE - 4)
+		val value = crc.value
+		for(i in 0 until 4)
+			report[HAPTICS_SINGLE_REPORT_SIZE - 4 + i] = ((value shr (8 * i)) and 0xff).toByte()
+		return report
+	}
+
+	/**
+	 * Reporte de estado para el modo háptica HD (0x31): desactiva el filtro paso-bajo de la háptica y la reducción de
+	 * potencia de motores, como el estado inicial de DS5Dongle (github.com/awalol/DS5Dongle, src/state_mgr.cpp: activa
+	 * AllowHapticLowPassFilter y AllowMotorPowerLevel con HapticLowPassFilter = 0). Offsets del bloque común:
+	 * enable bits 2 = 1 (SDL ucEnableBits2: 0x20 filtro háptico, 0x40 nivel de potencia), reduce_motor_power = 36
+	 * (hid-playstation), filtro = bit 0 del byte 39 (DS5Dongle utils.h). Los bits de gatillo quedan a 0: no los toca.
+	 */
+	fun hapticsStateBluetooth(sequence: Int): ByteArray
+	{
+		val report = ByteArray(BT_REPORT_SIZE)
+		report[0] = REPORT_ID_BT.toByte()
+		report[1] = ((sequence and 0x0f) shl 4).toByte()
+		report[2] = BT_TAG.toByte()
+		report[3 + OFFSET_ENABLE_BITS_2] = (ENABLE_HAPTIC_LOW_PASS or ENABLE_MOTOR_POWER).toByte()
+		return withCrc(report)
+	}
+
+	private fun withCrc(report: ByteArray): ByteArray
+	{
+		val crc = java.util.zip.CRC32()
+		crc.update(BT_CRC_SEED)
+		crc.update(report, 0, BT_REPORT_SIZE - 4)
+		val value = crc.value
+		for(i in 0 until 4)
+			report[BT_REPORT_SIZE - 4 + i] = ((value shr (8 * i)) and 0xff).toByte()
 		return report
 	}
 

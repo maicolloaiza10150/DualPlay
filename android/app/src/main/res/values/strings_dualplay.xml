@@ -50,6 +50,10 @@
     <string name="preferences_hd_haptics_buffer_title">HD haptics delay</string>
     <string name="preferences_hd_haptics_buffer_value">%d (lower = less delay, may cut out)</string>
 
+    <string name="preferences_hd_haptics_single_key">hd_haptics_single</string>
+    <string name="preferences_hd_haptics_single_title">HD haptics: small packets</string>
+    <string name="preferences_hd_haptics_single_summary">Send smaller packets twice as often (less delay). Turn off if the vibration cuts out.</string>
+
     <string name="developer_category_title">Developer</string>
     <string name="developer_dualsense_spike_title">DualSense USB spike</string>
     <string name="developer_bluetooth_spike_title">DualSense Bluetooth spike</string>

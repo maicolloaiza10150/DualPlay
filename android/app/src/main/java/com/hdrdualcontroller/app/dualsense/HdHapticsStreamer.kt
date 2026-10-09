@@ -1,4 +1,4 @@
-// SPDX-License-Identifier: LicenseRef-AGPL-3.0-only-OpenSSL
+﻿// SPDX-License-Identifier: LicenseRef-AGPL-3.0-only-OpenSSL
 
 package com.hdrdualcontroller.app.dualsense
 
@@ -21,9 +21,14 @@ class HdHapticsStreamer(
 	/** Multiplicador de la señal (1.0 = tal cual llega de la PS5). Se satura en int8. */
 	private val gain: Float = 1f,
 	/** Búfer interno de háptica del control (16..127); menos = menos retraso pero más riesgo de cortes. */
-	private val controllerBuffer: Int = OutputReportBuilder.HAPTICS_BUFFER_LENGTH
+	private val controllerBuffer: Int = OutputReportBuilder.HAPTICS_BUFFER_LENGTH,
+	/** true = reporte 0x32 (1 bloque de 32 muestras cada ~10,7 ms); false = 0x39 (2 bloques cada ~21,3 ms). */
+	private val singleBlock: Boolean = false
 )
 {
+	private val blockSamples = if(singleBlock) 32 else 64
+	private val maxQueueSamples = blockSamples * 3
+	private val periodNs = blockSamples * 1_000_000_000L / OutputReportBuilder.HAPTICS_SAMPLE_RATE
 	private val lock = Any()
 	// Muestras estéreo int8 intercaladas (L, R, L, R...) en un anillo.
 	private val ring = ByteArray(RING_SAMPLES * 2)
@@ -40,6 +45,9 @@ class HdHapticsStreamer(
 	private var statPeak = 0 // |muestra int16| máxima
 	private var statSumSquares = 0.0
 	private var statSamples = 0L
+	private var statSendNs = 0L
+	private var statSendMaxNs = 0L
+	private var statSends = 0
 	private val thread = Thread(::run, "DualSenseHaptics").also { it.isDaemon = true; it.start() }
 
 	/** Hilo de red de la sesión: no bloquea. `pcm` = estéreo int16 LE. */
@@ -90,12 +98,14 @@ class HdHapticsStreamer(
 
 	private fun run()
 	{
+		android.os.Process.setThreadPriority(android.os.Process.THREAD_PRIORITY_URGENT_AUDIO)
 		var device: BluetoothDevice? = null
 		var deviceCheckedAt = 0L
 		var nextAt = 0L
 		var active = false
 		var idleTicks = 0
-		val block = ByteArray(OutputReportBuilder.HAPTICS_BLOCK_BYTES)
+		var first = true
+		val block = ByteArray(blockSamples * 2)
 		var sent = 0L
 		var statsAt = System.nanoTime()
 		while(running)
@@ -117,6 +127,7 @@ class HdHapticsStreamer(
 				active = true
 				idleTicks = 0
 				nextAt = now // el primer bloque sale ya, sin colchón
+				first = true
 			}
 			if(now < nextAt)
 			{
@@ -124,17 +135,29 @@ class HdHapticsStreamer(
 				continue
 			}
 
+			// En régimen estable solo se mandan bloques completos: si faltan muestras se espera hasta GRACE_NS (no se
+			// mete silencio en medio de la vibración). El primer bloque de cada vibración sí sale parcial, sin espera.
+			if(!first && queued < blockSamples && now < nextAt + GRACE_NS)
+			{
+				LockSupport.parkNanos(1_000_000)
+				continue
+			}
+			if(first)
+			{
+				first = false
+				sendState(sender.connectedController())
+			}
 			val taken = synchronized(lock)
 			{
 				// Recorte de latencia: si hay más de MAX_QUEUE_SAMPLES se descarta lo más viejo.
-				if(count > MAX_QUEUE_SAMPLES)
+				if(count > maxQueueSamples)
 				{
-					val drop = count - MAX_QUEUE_SAMPLES
+					val drop = count - maxQueueSamples
 					head = (head + drop) % RING_SAMPLES
 					count -= drop
 					statTrimmed += drop
 				}
-				val n = minOf(count, BLOCK_SAMPLES)
+				val n = minOf(count, blockSamples)
 				block.fill(0)
 				for(i in 0 until n)
 				{
@@ -144,14 +167,14 @@ class HdHapticsStreamer(
 				}
 				head = (head + n) % RING_SAMPLES
 				count -= n
-				if(n in 1 until BLOCK_SAMPLES) statPartial++
+				if(n in 1 until blockSamples) statPartial++
 				n
 			}
 			if(taken == 0)
 			{
 				// Sin datos en este turno: tras dos turnos seguidos se considera silencio y el hilo se detiene.
 				if(++idleTicks >= 2) active = false
-				nextAt += PERIOD_NS
+				nextAt += periodNs
 				continue
 			}
 			idleTicks = 0
@@ -164,14 +187,29 @@ class HdHapticsStreamer(
 			val target = device
 			if(target != null && sender.available)
 			{
-				val report = OutputReportBuilder.hapticsBluetooth(block, nextSequence(), packetCounter, controllerBuffer)
-				packetCounter = (packetCounter + 2) and 0xff
+				val report = if(singleBlock)
+					OutputReportBuilder.hapticsBluetoothSingle(block, nextSequence(), packetCounter, controllerBuffer)
+				else
+					OutputReportBuilder.hapticsBluetooth(block, nextSequence(), packetCounter, controllerBuffer)
+				packetCounter = (packetCounter + (if(singleBlock) 1 else 2)) and 0xff
+				val t0 = System.nanoTime()
 				if(sender.send(target, report)) sent++
+				val dt = System.nanoTime() - t0
+				statSendNs += dt
+				if(dt > statSendMaxNs) statSendMaxNs = dt
+				statSends++
 			}
-			nextAt += PERIOD_NS
-			if(nextAt < now - 4 * PERIOD_NS) nextAt = now // se atrasó demasiado: se resincroniza
+			nextAt += periodNs
+			if(nextAt < System.nanoTime() - periodNs) nextAt = System.nanoTime() // atrasado: sin ráfagas de recuperación
 		}
 		Log.i(TAG, "Háptica HD: $sent reportes enviados")
+	}
+
+	/** Estado del control para háptica HD (sin filtro paso-bajo ni reducción de potencia); una vez por vibración. */
+	private fun sendState(device: BluetoothDevice?)
+	{
+		if(device != null && sender.available)
+			sender.send(device, OutputReportBuilder.hapticsStateBluetooth(nextSequence()))
 	}
 
 	private fun logStats(sent: Long)
@@ -182,6 +220,9 @@ class HdHapticsStreamer(
 		val maxQueued: Int
 		val peak: Int
 		val rms: Double
+		val sendAvgUs = if(statSends > 0) statSendNs / statSends / 1000 else 0
+		val sendMaxUs = statSendMaxNs / 1000
+		statSendNs = 0; statSendMaxNs = 0; statSends = 0
 		synchronized(lock)
 		{
 			frames = statFrames; trimmed = statTrimmed; partial = statPartial; maxQueued = statMaxQueued; peak = statPeak
@@ -191,16 +232,14 @@ class HdHapticsStreamer(
 		// Nivel en % de plena escala int16 (32768): pico y RMS de la háptica que llega de la PS5.
 		Log.i(TAG, "Háptica HD [5 s]: frames=$frames reportes=$sent recortadas=$trimmed incompletos=$partial " +
 			"colaMax=${maxQueued * 1000 / OutputReportBuilder.HAPTICS_SAMPLE_RATE}ms " +
-			"pico=%.1f%% rms=%.1f%% ganancia=%.2f búfer=$controllerBuffer".format(peak * 100.0 / 32768, rms * 100.0 / 32768, gain))
+			"pico=%.1f%% rms=%.1f%% ganancia=%.2f búfer=$controllerBuffer 0x${if(singleBlock) "32" else "39"} envío=${sendAvgUs}us(máx ${sendMaxUs}us)".format(peak * 100.0 / 32768, rms * 100.0 / 32768, gain))
 	}
 
 	private companion object
 	{
 		const val STATS_PERIOD_NS = 5_000_000_000L
 		const val TAG = "DualPlay"
-		const val BLOCK_SAMPLES = 64 // por reporte (2 x 32)
-		const val MAX_QUEUE_SAMPLES = 192 // 64 ms: más cola = más retraso
 		const val RING_SAMPLES = 512
-		const val PERIOD_NS = BLOCK_SAMPLES * 1_000_000_000L / OutputReportBuilder.HAPTICS_SAMPLE_RATE
+		const val GRACE_NS = 6_000_000L // espera máxima por un bloque completo
 	}
 }

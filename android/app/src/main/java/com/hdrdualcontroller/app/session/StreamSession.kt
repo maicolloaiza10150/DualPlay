@@ -75,7 +75,8 @@ class StreamSession(val context: Context, val connectInfo: ConnectInfo, val logM
 			if(connectInfo.enableDualSense && triggerFeedback == null)
 				triggerFeedback = TriggerFeedback(
 					context, connectInfo.enableHdHaptics,
-					Preferences(context).hdHapticsGainPercent / 100f, Preferences(context).hdHapticsBuffer)
+					Preferences(context).hdHapticsGainPercent / 100f, Preferences(context).hdHapticsBuffer,
+					Preferences(context).hdHapticsSingleBlock)
 			session.start()
 			val surface = surface
 			if(surface != null)

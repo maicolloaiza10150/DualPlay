@@ -21,7 +21,8 @@ class TriggerFeedback(
 	context: Context,
 	hdHaptics: Boolean = false,
 	private val hdGain: Float = 1f,
-	private val hdControllerBuffer: Int = OutputReportBuilder.HAPTICS_BUFFER_LENGTH
+	private val hdControllerBuffer: Int = OutputReportBuilder.HAPTICS_BUFFER_LENGTH,
+	private val hdSingleBlock: Boolean = false
 )
 {
 	/** Cambios pendientes de enviar; `null` = sin cambios en ese campo. */
@@ -39,7 +40,7 @@ class TriggerFeedback(
 		executor.execute {
 			opened = sender.open()
 			if(opened && useHdHaptics)
-				hdStreamer = HdHapticsStreamer(sender, sender::nextSequence, hdGain, hdControllerBuffer)
+				hdStreamer = HdHapticsStreamer(sender, sender::nextSequence, hdGain, hdControllerBuffer, hdSingleBlock)
 			if(!opened)
 				Log.w(TAG, "Los efectos del DualSense se ignorarán en esta sesión")
 		}

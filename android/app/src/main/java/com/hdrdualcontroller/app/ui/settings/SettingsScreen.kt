@@ -88,6 +88,7 @@ fun SettingsScreen(
 	var logVerbose by remember { mutableStateOf(prefs.logVerbose) }
 	var dualsenseFeatures by remember { mutableStateOf(prefs.dualsenseFeatures) }
 	var hdHaptics by remember { mutableStateOf(prefs.hdHaptics) }
+	var hdSingle by remember { mutableStateOf(prefs.hdHapticsSingleBlock) }
 	var hdGain by remember { mutableStateOf(prefs.hdHapticsGainPercent) }
 	var showHdGain by remember { mutableStateOf(false) }
 	var hdBuffer by remember { mutableStateOf(prefs.hdHapticsBuffer) }
@@ -191,6 +192,9 @@ fun SettingsScreen(
 			}
 			ClickItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_gain_title, stringResource(R.string.preferences_hd_haptics_gain_value, hdGain)) { showHdGain = true }
 			ClickItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_buffer_title, stringResource(R.string.preferences_hd_haptics_buffer_value, hdBuffer)) { showHdBuffer = true }
+			SwitchItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_single_title, R.string.preferences_hd_haptics_single_summary, hdSingle) {
+				hdSingle = it; prefs.hdHapticsSingleBlock = it
+			}
 			SwitchItem(R.drawable.ic_log, R.string.preferences_log_verbose_title, R.string.preferences_log_verbose_summary, logVerbose) {
 				logVerbose = it; prefs.logVerbose = it
 			}

@@ -87,7 +87,7 @@ class DualSenseBluetoothSender(context: Context)
 			return false
 		return try
 		{
-			val hex = report.joinToString("") { "%02x".format(it.toInt() and 0xff) }
+			val hex = toHex(report)
 			method.invoke(proxy, device, hex) as? Boolean ?: false
 		}
 		catch(e: Throwable)
@@ -95,6 +95,18 @@ class DualSenseBluetoothSender(context: Context)
 			fail("sendData: ${(e.cause ?: e).javaClass.simpleName}: ${(e.cause ?: e).message}")
 			false
 		}
+	}
+
+	private fun toHex(report: ByteArray): String
+	{
+		val out = CharArray(report.size * 2)
+		for(i in report.indices)
+		{
+			val v = report[i].toInt() and 0xff
+			out[i * 2] = HEX[v shr 4]
+			out[i * 2 + 1] = HEX[v and 15]
+		}
+		return String(out)
 	}
 
 	fun close()
@@ -116,6 +128,7 @@ class DualSenseBluetoothSender(context: Context)
 	private companion object
 	{
 		const val TAG = "DualPlay"
+		val HEX = "0123456789abcdef".toCharArray()
 		const val PROFILE_HID_HOST = 4 // BluetoothProfile.HID_HOST (@hide)
 	}
 }

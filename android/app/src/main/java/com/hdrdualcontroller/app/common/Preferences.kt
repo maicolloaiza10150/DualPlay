@@ -115,6 +115,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getInt(hdHapticsBufferKey, 32).coerceIn(16, 127)
 		set(value) { sharedPreferences.edit().putInt(hdHapticsBufferKey, value.coerceIn(16, 127)).apply() }
 
+	// DUALPLAY: háptica HD con reportes 0x32 (1 bloque cada ~10,7 ms) en lugar de 0x39 (2 bloques cada ~21,3 ms).
+	val hdHapticsSingleBlockKey get() = resources.getString(R.string.preferences_hd_haptics_single_key)
+	var hdHapticsSingleBlock
+		get() = sharedPreferences.getBoolean(hdHapticsSingleBlockKey, true)
+		set(value) { sharedPreferences.edit().putBoolean(hdHapticsSingleBlockKey, value).apply() }
+
 	val logVerboseKey get() = resources.getString(R.string.preferences_log_verbose_key)
 	var logVerbose
 		get() = sharedPreferences.getBoolean(logVerboseKey, false)
