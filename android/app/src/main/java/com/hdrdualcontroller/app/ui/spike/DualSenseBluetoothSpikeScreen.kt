@@ -70,6 +70,18 @@ fun DualSenseBluetoothSpikeScreen(onBack: () -> Unit)
 		}
 	}
 
+	fun runTone(frequencyHz: Int)
+	{
+		running = true
+		scope.launch {
+			withContext(Dispatchers.IO) {
+				try { spike.hdHapticsTone(frequencyHz, seconds = 3, amplitude = 100) { line -> scope.launch(Dispatchers.Main) { log.add(line) } } }
+				catch(e: Throwable) { scope.launch(Dispatchers.Main) { log.add("excepción: ${e.javaClass.simpleName}: ${e.message}") } }
+			}
+			running = false
+		}
+	}
+
 	val permissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
 		if(granted) run() else log.add("Permiso BLUETOOTH_CONNECT denegado.")
 	}
@@ -104,6 +116,17 @@ fun DualSenseBluetoothSpikeScreen(onBack: () -> Unit)
 				},
 				modifier = Modifier.fillMaxWidth()
 			) { Text(if(running) "Ejecutando…" else "Enviar efecto por BluetoothHidHost.sendData") }
+
+			Button(
+				enabled = !running,
+				onClick = { runTone(80) },
+				modifier = Modifier.fillMaxWidth()
+			) { Text("E: háptica HD, tono grave 80 Hz (3 s)") }
+			Button(
+				enabled = !running,
+				onClick = { runTone(200) },
+				modifier = Modifier.fillMaxWidth()
+			) { Text("E: háptica HD, tono 200 Hz (3 s)") }
 
 			Text(
 				log.joinToString("\n"),

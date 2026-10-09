@@ -72,7 +72,7 @@ class StreamSession(val context: Context, val connectInfo: ConnectInfo, val logM
 			_state.value = StreamStateConnecting
 			session.eventCallback = this::eventCallback
 			if(connectInfo.enableDualSense && triggerFeedback == null)
-				triggerFeedback = TriggerFeedback(context)
+				triggerFeedback = TriggerFeedback(context, connectInfo.enableHdHaptics)
 			session.start()
 			val surface = surface
 			if(surface != null)
@@ -102,6 +102,7 @@ class StreamSession(val context: Context, val connectInfo: ConnectInfo, val logM
 				)
 			)
 			is RumbleEvent -> _rumbleState.postValue(event)
+			is HapticFrameEvent -> triggerFeedback?.onHapticFrame(event.pcm)
 			is HapticRumbleEvent ->
 			{
 				if(!hapticLogged)

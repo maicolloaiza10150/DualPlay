@@ -77,6 +77,11 @@ object OutputReportBuilder
 	const val BT_REPORT_SIZE = 78
 	const val BT_TAG = 0x10
 	const val BT_CRC_SEED = 0xA2
+	const val REPORT_ID_HAPTICS = 0x39
+	const val HAPTICS_REPORT_SIZE = 547
+	const val HAPTICS_BLOCK_BYTES = 128
+	const val HAPTICS_BUFFER_LENGTH = 48 // valor por defecto de DS5Dongle (rango 16..127)
+	const val HAPTICS_SAMPLE_RATE = 3000
 
 	/** Un `null` deja el gatillo como está (su bit de validez no se activa). */
 	fun triggerEffects(left: TriggerEffect?, right: TriggerEffect?): ByteArray
@@ -119,6 +124,37 @@ object OutputReportBuilder
 		val value = crc.value
 		for(i in 0 until 4)
 			report[BT_REPORT_SIZE - 4 + i] = ((value shr (8 * i)) and 0xff).toByte()
+		return report
+	}
+
+	/**
+	 * Reporte Bluetooth 0x39 (547 bytes) con 2 bloques de háptica HD: 2 x 64 bytes = 2 x 32 muestras estéreo int8 a 3000 Hz
+	 * (~21,3 ms de audio por reporte, uno cada ~21,3 ms). Formato reverse-engineered, tomado del firmware DS5Dongle
+	 * (github.com/awalol/DS5Dongle, MIT, src/audio.cpp `audio_bt_task`): [0]=0x39, [1]=seq<<4, paquete 0x11 (cabecera 0x91,
+	 * longitud 6, flags 0x7E, 4 bytes de AudioBufferLength, contador de paquetes que sube de 2 en 2), paquete 0x12
+	 * (cabecera 0xD2, longitud 64, 128 bytes de muestras), resto a cero (sin altavoz ni micrófono) y CRC32 con semilla 0xA2.
+	 * Por 0x39 el control usa el audio como háptica en lugar del rumble: no mezclar con `outputBluetooth(rumble = ...)`.
+	 */
+	fun hapticsBluetooth(block: ByteArray, sequence: Int, packetCounter: Int, bufferLength: Int = HAPTICS_BUFFER_LENGTH): ByteArray
+	{
+		require(block.size == HAPTICS_BLOCK_BYTES) { "El bloque de háptica son $HAPTICS_BLOCK_BYTES bytes (2 x 64)" }
+		val report = ByteArray(HAPTICS_REPORT_SIZE)
+		report[0] = REPORT_ID_HAPTICS.toByte()
+		report[1] = ((sequence and 0x0f) shl 4).toByte()
+		report[2] = 0x91.toByte() // paquete 0x11 | bit 7
+		report[3] = 6
+		report[4] = 0x7E
+		for(i in 5..8) report[i] = bufferLength.toByte()
+		report[9] = packetCounter.toByte()
+		report[10] = 0xD2.toByte() // paquete 0x12 | bits 6 y 7
+		report[11] = 64
+		block.copyInto(report, 12)
+		val crc = java.util.zip.CRC32()
+		crc.update(BT_CRC_SEED)
+		crc.update(report, 0, HAPTICS_REPORT_SIZE - 4)
+		val value = crc.value
+		for(i in 0 until 4)
+			report[HAPTICS_REPORT_SIZE - 4 + i] = ((value shr (8 * i)) and 0xff).toByte()
 		return report
 	}
 

@@ -71,7 +71,9 @@ data class ConnectInfo(
 	val morning: ByteArray,
 	val videoProfile: ConnectVideoProfile,
 	// DUALPLAY: la PS5 trata al cliente como DualSense y envía efectos de gatillo (ver Preferences.dualsenseFeatures).
-	val enableDualSense: Boolean = false
+	val enableDualSense: Boolean = false,
+	// DUALPLAY: háptica HD por Bluetooth (experimental); solo tiene efecto con enableDualSense.
+	val enableHdHaptics: Boolean = false
 ): Parcelable
 
 private class ChiakiNative
@@ -321,6 +323,8 @@ data class QuitEvent(val reason: QuitReason, val reasonString: String?): Event()
 data class RumbleEvent(val left: UByte, val right: UByte): Event()
 // DUALPLAY: tipo + 10 bytes por gatillo, tal cual los manda la PS5.
 // DUALPLAY: fuerza de rumble (0..65535) derivada de la háptica de la PS5 en modo DualSense.
+// DUALPLAY: PCM crudo de háptica de la PS5 (estéreo int16 little-endian a 3000 Hz).
+class HapticFrameEvent(val pcm: ByteArray): Event()
 class HapticRumbleEvent(val strength: Int): Event()
 class TriggerEffectsEvent(val typeLeft: Int, val typeRight: Int, val left: ByteArray, val right: ByteArray): Event()
 
@@ -381,6 +385,11 @@ class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean)
 	private fun eventRumble(left: Int, right: Int)
 	{
 		event(RumbleEvent(left.toUByte(), right.toUByte()))
+	}
+
+	private fun eventHapticFrame(pcm: ByteArray)
+	{
+		event(HapticFrameEvent(pcm))
 	}
 
 	private fun eventHapticRumble(strength: Int)

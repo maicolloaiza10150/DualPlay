@@ -38,6 +38,47 @@ class DualSenseBluetoothHidSpike(private val context: Context)
 
 	private fun say(log: (String) -> Unit, line: String) { Log.i(TAG, line); log(line) }
 
+	/**
+	 * SPIKE E: háptica HD por Bluetooth. Manda un tono senoidal de `frequencyHz` durante `seconds` s usando reportes 0x39
+	 * (2 bloques de 32 muestras int8 estéreo a 3 kHz cada ~21,3 ms). Bloqueante (hilo de fondo).
+	 */
+	fun hdHapticsTone(frequencyHz: Int, seconds: Int, amplitude: Int, log: (String) -> Unit)
+	{
+		val sender = DualSenseBluetoothSender(context)
+		if(!sender.open()) { say(log, "FIN: no se pudo abrir el perfil HID Host"); return }
+		try
+		{
+			val device = sender.connectedController() ?: run { say(log, "FIN: el DualSense no está conectado como 'Input device'"); return }
+			val blockSamples = 64 // por reporte: 2 bloques x 32 muestras estéreo
+			val periodNs = blockSamples * 1_000_000_000L / OutputReportBuilder.HAPTICS_SAMPLE_RATE
+			val reports = seconds * 1_000_000_000L / periodNs
+			say(log, "== E1: tono de $frequencyHz Hz, amplitud $amplitude/127, $seconds s = $reports reportes cada ${periodNs / 1_000_000.0} ms")
+			var phase = 0
+			var counter = 0
+			var sent = 0
+			var failed = 0
+			val start = System.nanoTime()
+			for(n in 0 until reports)
+			{
+				val block = ByteArray(OutputReportBuilder.HAPTICS_BLOCK_BYTES)
+				for(i in 0 until blockSamples)
+				{
+					val value = (Math.sin(2.0 * Math.PI * frequencyHz * phase / OutputReportBuilder.HAPTICS_SAMPLE_RATE) * amplitude).toInt().toByte()
+					block[i * 2] = value
+					block[i * 2 + 1] = value
+					phase++
+				}
+				val report = OutputReportBuilder.hapticsBluetooth(block, sequence = (n and 0x0f).toInt(), packetCounter = counter and 0xff)
+				counter += 2
+				if(sender.send(device, report)) sent++ else failed++
+				val wait = start + (n + 1) * periodNs - System.nanoTime()
+				if(wait > 0) Thread.sleep(wait / 1_000_000, (wait % 1_000_000).toInt())
+			}
+			say(log, "E1 fin: $sent enviados, $failed fallidos en ${(System.nanoTime() - start) / 1_000_000} ms. ¿Notaste una vibración fina?")
+		}
+		finally { sender.close() }
+	}
+
 	/** Bloqueante (hilo de fondo). */
 	@SuppressLint("MissingPermission")
 	fun send(left: TriggerEffect?, right: TriggerEffect?, log: (String) -> Unit)

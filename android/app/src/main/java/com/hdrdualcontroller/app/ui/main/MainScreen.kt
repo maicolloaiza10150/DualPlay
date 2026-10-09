@@ -108,7 +108,8 @@ fun MainScreen(
 		val profile = HdrSupport.adjust(context, requested)
 		if(profile.codec != requested.codec)
 			Toast.makeText(context, R.string.stream_hdr_unavailable, Toast.LENGTH_LONG).show()
-		val connectInfo = ConnectInfo(host.isPS5, host.host, registeredHost.rpRegistKey, registeredHost.rpKey, profile, Preferences(context).dualsenseFeatures)
+		val connectInfo = ConnectInfo(host.isPS5, host.host, registeredHost.rpRegistKey, registeredHost.rpKey, profile, Preferences(context).dualsenseFeatures,
+			Preferences(context).dualsenseFeatures && Preferences(context).hdHaptics)
 		context.startActivity(Intent(context, StreamActivity::class.java).putExtra(StreamActivity.EXTRA_CONNECT_INFO, connectInfo))
 	}
 

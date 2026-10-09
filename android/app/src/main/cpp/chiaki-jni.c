@@ -11,6 +11,7 @@
 #include <chiaki/regist.h>
 
 #include <string.h>
+#include <pthread.h>
 #include <linux/in.h>
 #include <linux/in6.h>
 #include <arpa/inet.h>
@@ -140,6 +141,8 @@ typedef struct android_chiaki_session_t
 	uint32_t haptic_sum;
 	int haptic_count;
 	bool haptic_on;
+	bool hd_haptics; // DUALPLAY: se reenvían los frames crudos de háptica (3 kHz int16) en vez de calcular rumble
+	jmethodID java_session_event_haptic_frame_meth;
 	jfieldID java_controller_state_buttons;
 	jfieldID java_controller_state_l2_state;
 	jfieldID java_controller_state_r2_state;
@@ -167,6 +170,29 @@ typedef struct android_chiaki_session_t
 	void *audio_output;
 } AndroidChiakiSession;
 
+// DUALPLAY: adjunto de hilo persistente (se desadjunta al terminar el hilo): evita adjuntar/desadjuntar 100 veces por segundo
+static pthread_key_t haptics_detach_key;
+static pthread_once_t haptics_detach_once = PTHREAD_ONCE_INIT;
+static void haptics_detach_destructor(void *unused)
+{
+	(*global_vm)->DetachCurrentThread(global_vm);
+}
+static void haptics_detach_key_create(void)
+{
+	pthread_key_create(&haptics_detach_key, haptics_detach_destructor);
+}
+static JNIEnv *attach_thread_jni_persistent()
+{
+	JNIEnv *env;
+	if((*global_vm)->GetEnv(global_vm, (void **)&env, JNI_VERSION) == JNI_OK)
+		return env;
+	if((*global_vm)->AttachCurrentThread(global_vm, &env, NULL) != 0)
+		return NULL;
+	pthread_once(&haptics_detach_once, haptics_detach_key_create);
+	pthread_setspecific(haptics_detach_key, (void *)1);
+	return env;
+}
+
 // DUALPLAY: constantes de gui/src/streamsession.cpp (HAPTIC_RUMBLE_MIN_STRENGTH, RUMBLE_HAPTICS_PACKETS_PER_RUMBLE)
 #define HAPTIC_RUMBLE_MIN_STRENGTH 100
 #define HAPTIC_RUMBLE_PACKETS_PER_RUMBLE 3
@@ -181,6 +207,21 @@ static void android_chiaki_haptics_frame_cb(uint8_t *buf, size_t buf_size, void 
 	const size_t sample_size = 2 * sizeof(int16_t);
 	if(buf_size == 0 || (buf_size % sample_size) != 0)
 		return;
+	if(session->hd_haptics)
+	{
+		// Háptica HD: el PCM crudo va a Kotlin, que lo convierte y lo manda al control por Bluetooth.
+		JNIEnv *env = attach_thread_jni_persistent();
+		if(!env)
+			return;
+		jbyteArray pcm = E->NewByteArray(env, (jsize)buf_size);
+		if(pcm)
+		{
+			E->SetByteArrayRegion(env, pcm, 0, (jsize)buf_size, (const jbyte *)buf);
+			E->CallVoidMethod(env, session->java_session, session->java_session_event_haptic_frame_meth, pcm);
+			E->DeleteLocalRef(env, pcm);
+		}
+		return;
+	}
 	size_t count = buf_size / sample_size;
 	uint32_t sum_left = 0, sum_right = 0;
 	for(size_t i = 0; i < count; i++)
@@ -410,6 +451,8 @@ JNIEXPORT void JNICALL JNI_FCN(sessionCreate)(JNIEnv *env, jobject obj, jobject 
 	session->haptic_sum = 0;
 	session->haptic_count = 0;
 	session->haptic_on = false;
+	session->java_session_event_haptic_frame_meth = E->GetMethodID(env, session->java_session_class, "eventHapticFrame", "([B)V"); // DUALPLAY
+	session->hd_haptics = E->GetBooleanField(env, connect_info_obj, E->GetFieldID(env, connect_info_class, "enableHdHaptics", "Z"));
 
 	jclass controller_state_class = E->FindClass(env, BASE_PACKAGE"/ControllerState");
 	session->java_controller_state_buttons = E->GetFieldID(env, controller_state_class, "buttons", "I");

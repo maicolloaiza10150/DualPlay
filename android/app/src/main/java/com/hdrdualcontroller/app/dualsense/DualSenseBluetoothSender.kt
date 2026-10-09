@@ -30,6 +30,11 @@ class DualSenseBluetoothSender(context: Context)
 	private var proxy: BluetoothProfile? = null
 	private var sendMethod: java.lang.reflect.Method? = null
 
+	private val sequenceCounter = java.util.concurrent.atomic.AtomicInteger()
+
+	/** Contador de 4 bits compartido por todos los reportes (0x31 y 0x39), como `reportSeqCounter` de DS5Dongle. */
+	fun nextSequence(): Int = sequenceCounter.getAndIncrement() and 0x0f
+
 	/** false si no hay permiso, no hay API o falló un envío; ya no se reintenta en esta sesión. */
 	@Volatile var available = false
 		private set

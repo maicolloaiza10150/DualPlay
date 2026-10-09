@@ -38,6 +38,10 @@
     <string name="preferences_dualsense_features_summary">Send the trigger effects of the game to a DualSense over Bluetooth. Needs the Bluetooth permission and the controller connected as an input device. May change how rumble is delivered.</string>
     <string name="preferences_dualsense_features_denied">Bluetooth permission denied; adaptive triggers stay off.</string>
 
+    <string name="preferences_hd_haptics_key">hd_haptics</string>
+    <string name="preferences_hd_haptics_title">HD haptics (experimental)</string>
+    <string name="preferences_hd_haptics_summary">Send the real haptic signal of the game to the DualSense over Bluetooth instead of a simple rumble. Needs adaptive triggers enabled.</string>
+
     <string name="developer_category_title">Developer</string>
     <string name="developer_dualsense_spike_title">DualSense USB spike</string>
     <string name="developer_bluetooth_spike_title">DualSense Bluetooth spike</string>

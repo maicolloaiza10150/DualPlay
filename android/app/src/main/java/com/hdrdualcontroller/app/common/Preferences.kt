@@ -97,6 +97,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(dualsenseFeaturesKey, false)
 		set(value) { sharedPreferences.edit().putBoolean(dualsenseFeaturesKey, value).apply() }
 
+	// DUALPLAY: háptica HD por Bluetooth (experimental). Sin esto, el rumble se emula con la fuerza media de la háptica.
+	val hdHapticsKey get() = resources.getString(R.string.preferences_hd_haptics_key)
+	var hdHaptics
+		get() = sharedPreferences.getBoolean(hdHapticsKey, false)
+		set(value) { sharedPreferences.edit().putBoolean(hdHapticsKey, value).apply() }
+
 	val logVerboseKey get() = resources.getString(R.string.preferences_log_verbose_key)
 	var logVerbose
 		get() = sharedPreferences.getBoolean(logVerboseKey, false)

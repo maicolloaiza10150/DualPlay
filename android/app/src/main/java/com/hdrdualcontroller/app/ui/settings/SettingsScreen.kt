@@ -87,6 +87,7 @@ fun SettingsScreen(
 	var buttonHaptic by remember { mutableStateOf(prefs.buttonHapticEnabled) }
 	var logVerbose by remember { mutableStateOf(prefs.logVerbose) }
 	var dualsenseFeatures by remember { mutableStateOf(prefs.dualsenseFeatures) }
+	var hdHaptics by remember { mutableStateOf(prefs.hdHaptics) }
 	var resolution by remember { mutableStateOf(prefs.resolution) }
 	var fps by remember { mutableStateOf(prefs.fps) }
 	var codec by remember { mutableStateOf(prefs.codec) }
@@ -180,6 +181,9 @@ fun SettingsScreen(
 				}
 				else
 					bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+			}
+			SwitchItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_title, R.string.preferences_hd_haptics_summary, hdHaptics) {
+				hdHaptics = it; prefs.hdHaptics = it
 			}
 			SwitchItem(R.drawable.ic_log, R.string.preferences_log_verbose_title, R.string.preferences_log_verbose_summary, logVerbose) {
 				logVerbose = it; prefs.logVerbose = it

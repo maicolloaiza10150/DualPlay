@@ -17,7 +17,7 @@ class TriggerEffects(val left: TriggerEffect, val right: TriggerEffect)
  * independientes, así que se fusionan: de cada uno gana el último valor y se envía como mucho un reporte cada
  * `MIN_INTERVAL_MS`. Al cerrar se apagan gatillos y motores, porque el control conserva el último estado.
  */
-class TriggerFeedback(context: Context)
+class TriggerFeedback(context: Context, hdHaptics: Boolean = false)
 {
 	/** Cambios pendientes de enviar; `null` = sin cambios en ese campo. */
 	private class Pending(val triggers: TriggerEffects?, val rumble: Int?)
@@ -25,12 +25,19 @@ class TriggerFeedback(context: Context)
 	private val sender = DualSenseBluetoothSender(context)
 	private val executor = Executors.newSingleThreadExecutor { Thread(it, "DualSenseOutput").also { t -> t.isDaemon = true } }
 	private val pending = AtomicReference<Pending?>(null)
-	private var sequence = 0
 	private var opened = false
+	private var hdStreamer: HdHapticsStreamer? = null
+	private val useHdHaptics = hdHaptics
 
 	init
 	{
-		executor.execute { opened = sender.open(); if(!opened) Log.w(TAG, "Los efectos del DualSense se ignorarán en esta sesión") }
+		executor.execute {
+			opened = sender.open()
+			if(opened && useHdHaptics)
+				hdStreamer = HdHapticsStreamer(sender, sender::nextSequence)
+			if(!opened)
+				Log.w(TAG, "Los efectos del DualSense se ignorarán en esta sesión")
+		}
 	}
 
 	/** Llamar desde cualquier hilo; no bloquea. */
@@ -38,6 +45,12 @@ class TriggerFeedback(context: Context)
 	{
 		pending.updateAndGet { Pending(effects, it?.rumble) }
 		executor.execute { drain() }
+	}
+
+	/** Frame crudo de háptica de la PS5 (estéreo int16 a 3 kHz). Solo se usa en modo háptica HD. */
+	fun onHapticFrame(pcm: ByteArray)
+	{
+		hdStreamer?.onFrame(pcm)
 	}
 
 	/** `strength` 0..255 (la háptica llega con 16 bits: se pasa `>> 8`, como `SetHapticRumble` del escritorio). */
@@ -53,8 +66,7 @@ class TriggerFeedback(context: Context)
 		if(!opened || !sender.available)
 			return
 		val device = sender.connectedController() ?: return
-		val report = OutputReportBuilder.outputBluetooth(change.triggers?.left, change.triggers?.right, change.rumble, sequence)
-		sequence = (sequence + 1) and 0x0f
+		val report = OutputReportBuilder.outputBluetooth(change.triggers?.left, change.triggers?.right, change.rumble, sender.nextSequence())
 		sender.send(device, report)
 		// Mientras duerme, los eventos nuevos sobrescriben `pending`: solo se envía lo más reciente.
 		try { Thread.sleep(MIN_INTERVAL_MS) } catch(_: InterruptedException) {}
@@ -65,9 +77,11 @@ class TriggerFeedback(context: Context)
 	{
 		pending.set(null)
 		executor.execute {
+			hdStreamer?.close()
+			hdStreamer = null
 			if(opened && sender.available)
 				sender.connectedController()?.let {
-					sender.send(it, OutputReportBuilder.outputBluetooth(TriggerEffect.CLEAR, TriggerEffect.CLEAR, rumble = 0, sequence = sequence))
+					sender.send(it, OutputReportBuilder.outputBluetooth(TriggerEffect.CLEAR, TriggerEffect.CLEAR, rumble = 0, sequence = sender.nextSequence()))
 				}
 			sender.close()
 		}
