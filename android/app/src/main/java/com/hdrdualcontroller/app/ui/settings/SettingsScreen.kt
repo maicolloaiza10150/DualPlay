@@ -2,9 +2,13 @@
 
 package com.hdrdualcontroller.app.ui.settings
 
+import android.Manifest
 import android.app.Activity
 import android.content.Context
 import android.content.pm.ApplicationInfo
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.core.content.ContextCompat
 import android.content.ContextWrapper
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
@@ -82,6 +86,7 @@ fun SettingsScreen(
 	var motion by remember { mutableStateOf(prefs.motionEnabled) }
 	var buttonHaptic by remember { mutableStateOf(prefs.buttonHapticEnabled) }
 	var logVerbose by remember { mutableStateOf(prefs.logVerbose) }
+	var dualsenseFeatures by remember { mutableStateOf(prefs.dualsenseFeatures) }
 	var resolution by remember { mutableStateOf(prefs.resolution) }
 	var fps by remember { mutableStateOf(prefs.fps) }
 	var codec by remember { mutableStateOf(prefs.codec) }
@@ -102,6 +107,17 @@ fun SettingsScreen(
 	var showFps by remember { mutableStateOf(false) }
 	var showCodec by remember { mutableStateOf(false) }
 	var showBitrate by remember { mutableStateOf(false) }
+
+	// Los efectos de gatillo por Bluetooth necesitan BLUETOOTH_CONNECT: se pide al activar la opción.
+	val bluetoothPermissionLauncher = rememberLauncherForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+		if(granted)
+		{
+			dualsenseFeatures = true
+			prefs.dualsenseFeatures = true
+		}
+		else
+			Toast.makeText(context, R.string.preferences_dualsense_features_denied, Toast.LENGTH_LONG).show()
+	}
 
 	val importLauncher = rememberLauncherForActivityResult(ActivityResultContracts.OpenDocument()) { uri ->
 		val activity = context.findActivity()
@@ -150,6 +166,20 @@ fun SettingsScreen(
 			}
 			SwitchItem(R.drawable.ic_button_haptic, R.string.preferences_button_haptic_enabled_title, R.string.preferences_button_haptic_enabled_summary, buttonHaptic) {
 				buttonHaptic = it; prefs.buttonHapticEnabled = it
+			}
+			SwitchItem(R.drawable.ic_gamepad, R.string.preferences_dualsense_features_title, R.string.preferences_dualsense_features_summary, dualsenseFeatures) { enabled ->
+				if(!enabled)
+				{
+					dualsenseFeatures = false
+					prefs.dualsenseFeatures = false
+				}
+				else if(ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED)
+				{
+					dualsenseFeatures = true
+					prefs.dualsenseFeatures = true
+				}
+				else
+					bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
 			}
 			SwitchItem(R.drawable.ic_log, R.string.preferences_log_verbose_title, R.string.preferences_log_verbose_summary, logVerbose) {
 				logVerbose = it; prefs.logVerbose = it

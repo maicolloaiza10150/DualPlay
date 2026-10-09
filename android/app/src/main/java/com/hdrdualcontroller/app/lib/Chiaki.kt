@@ -69,7 +69,9 @@ data class ConnectInfo(
 	val host: String,
 	val registKey: ByteArray,
 	val morning: ByteArray,
-	val videoProfile: ConnectVideoProfile
+	val videoProfile: ConnectVideoProfile,
+	// DUALPLAY: la PS5 trata al cliente como DualSense y envía efectos de gatillo (ver Preferences.dualsenseFeatures).
+	val enableDualSense: Boolean = false
 ): Parcelable
 
 private class ChiakiNative
@@ -317,6 +319,8 @@ object ConnectedEvent: Event()
 data class LoginPinRequestEvent(val pinIncorrect: Boolean): Event()
 data class QuitEvent(val reason: QuitReason, val reasonString: String?): Event()
 data class RumbleEvent(val left: UByte, val right: UByte): Event()
+// DUALPLAY: tipo + 10 bytes por gatillo, tal cual los manda la PS5.
+class TriggerEffectsEvent(val typeLeft: Int, val typeRight: Int, val left: ByteArray, val right: ByteArray): Event()
 
 class CreateError(val errorCode: ErrorCode): Exception("Failed to create a native object: $errorCode")
 
@@ -375,6 +379,11 @@ class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean)
 	private fun eventRumble(left: Int, right: Int)
 	{
 		event(RumbleEvent(left.toUByte(), right.toUByte()))
+	}
+
+	private fun eventTriggerEffects(typeLeft: Int, typeRight: Int, left: ByteArray, right: ByteArray)
+	{
+		event(TriggerEffectsEvent(typeLeft, typeRight, left, right))
 	}
 
 	fun setSurface(surface: Surface?)

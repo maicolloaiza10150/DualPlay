@@ -33,6 +33,11 @@
     <string name="preferences_codec_title_h265_hdr">H265 HDR (PS5 only, HDR10 display)</string>
     <string name="stream_hdr_unavailable">HDR is not available on this phone or display. Using H265 SDR.</string>
 
+    <string name="preferences_dualsense_features_key">dualsense_features</string>
+    <string name="preferences_dualsense_features_title">DualSense adaptive triggers</string>
+    <string name="preferences_dualsense_features_summary">Send the trigger effects of the game to a DualSense over Bluetooth. Needs the Bluetooth permission and the controller connected as an input device. May change how rumble is delivered.</string>
+    <string name="preferences_dualsense_features_denied">Bluetooth permission denied; adaptive triggers stay off.</string>
+
     <string name="developer_category_title">Developer</string>
     <string name="developer_dualsense_spike_title">DualSense USB spike</string>
     <string name="developer_bluetooth_spike_title">DualSense Bluetooth spike</string>

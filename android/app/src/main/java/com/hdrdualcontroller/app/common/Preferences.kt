@@ -91,6 +91,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(buttonHapticEnabledKey, true)
 		set(value) { sharedPreferences.edit().putBoolean(buttonHapticEnabledKey, value).apply() }
 
+	// DUALPLAY: efectos de gatillo adaptativo del DualSense (la PS5 trata al cliente como DualSense).
+	val dualsenseFeaturesKey get() = resources.getString(R.string.preferences_dualsense_features_key)
+	var dualsenseFeatures
+		get() = sharedPreferences.getBoolean(dualsenseFeaturesKey, false)
+		set(value) { sharedPreferences.edit().putBoolean(dualsenseFeaturesKey, value).apply() }
+
 	val logVerboseKey get() = resources.getString(R.string.preferences_log_verbose_key)
 	var logVerbose
 		get() = sharedPreferences.getBoolean(logVerboseKey, false)

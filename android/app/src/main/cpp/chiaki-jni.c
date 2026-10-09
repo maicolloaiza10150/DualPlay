@@ -134,6 +134,7 @@ typedef struct android_chiaki_session_t
 	jmethodID java_session_event_login_pin_request_meth;
 	jmethodID java_session_event_quit_meth;
 	jmethodID java_session_event_rumble_meth;
+	jmethodID java_session_event_trigger_effects_meth; // DUALPLAY
 	jfieldID java_controller_state_buttons;
 	jfieldID java_controller_state_l2_state;
 	jfieldID java_controller_state_r2_state;
@@ -199,6 +200,26 @@ static void android_chiaki_event_cb(ChiakiEvent *event, void *user)
 							  (jint)event->rumble.left,
 							  (jint)event->rumble.right);
 			break;
+		case CHIAKI_EVENT_TRIGGER_EFFECTS: // DUALPLAY: efectos de gatillo adaptativo (solo llegan con enable_dualsense)
+		{
+			jbyteArray left = E->NewByteArray(env, sizeof(event->trigger_effects.left));
+			jbyteArray right = E->NewByteArray(env, sizeof(event->trigger_effects.right));
+			if(left && right)
+			{
+				E->SetByteArrayRegion(env, left, 0, sizeof(event->trigger_effects.left), (const jbyte *)event->trigger_effects.left);
+				E->SetByteArrayRegion(env, right, 0, sizeof(event->trigger_effects.right), (const jbyte *)event->trigger_effects.right);
+				E->CallVoidMethod(env, session->java_session,
+								  session->java_session_event_trigger_effects_meth,
+								  (jint)event->trigger_effects.type_left,
+								  (jint)event->trigger_effects.type_right,
+								  left, right);
+			}
+			if(left)
+				E->DeleteLocalRef(env, left);
+			if(right)
+				E->DeleteLocalRef(env, right);
+			break;
+		}
 		default:
 			break;
 	}
@@ -236,6 +257,8 @@ JNIEXPORT void JNICALL JNI_FCN(sessionCreate)(JNIEnv *env, jobject obj, jobject 
 
 	ChiakiConnectInfo connect_info = { 0 };
 	connect_info.ps5 = ps5;
+	// DUALPLAY: declara el cliente como DualSense para que la PS5 mande efectos de gatillo (opcional en Ajustes).
+	connect_info.enable_dualsense = E->GetBooleanField(env, connect_info_obj, E->GetFieldID(env, connect_info_class, "enableDualSense", "Z"));
 
 	const char *str_borrow = E->GetStringUTFChars(env, host_string, NULL);
 	connect_info.host = host_str = strdup(str_borrow);
@@ -326,6 +349,7 @@ JNIEXPORT void JNICALL JNI_FCN(sessionCreate)(JNIEnv *env, jobject obj, jobject 
 	session->java_session_event_login_pin_request_meth = E->GetMethodID(env, session->java_session_class, "eventLoginPinRequest", "(Z)V");
 	session->java_session_event_quit_meth = E->GetMethodID(env, session->java_session_class, "eventQuit", "(ILjava/lang/String;)V");
 	session->java_session_event_rumble_meth = E->GetMethodID(env, session->java_session_class, "eventRumble", "(II)V");
+	session->java_session_event_trigger_effects_meth = E->GetMethodID(env, session->java_session_class, "eventTriggerEffects", "(II[B[B)V"); // DUALPLAY
 
 	jclass controller_state_class = E->FindClass(env, BASE_PACKAGE"/ControllerState");
 	session->java_controller_state_buttons = E->GetFieldID(env, controller_state_class, "buttons", "I");

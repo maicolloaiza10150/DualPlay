@@ -2,12 +2,16 @@
 
 package com.hdrdualcontroller.app.session
 
+import android.content.Context
 import android.graphics.SurfaceTexture
 import android.util.Log
 import android.view.*
 import androidx.lifecycle.LiveData
 import androidx.lifecycle.MutableLiveData
 import com.hdrdualcontroller.app.common.LogManager
+import com.hdrdualcontroller.app.dualsense.TriggerEffect
+import com.hdrdualcontroller.app.dualsense.TriggerEffects
+import com.hdrdualcontroller.app.dualsense.TriggerFeedback
 import com.hdrdualcontroller.app.lib.*
 
 sealed class StreamState
@@ -18,8 +22,11 @@ data class StreamStateCreateError(val error: CreateError): StreamState()
 data class StreamStateQuit(val reason: QuitReason, val reasonString: String?): StreamState()
 data class StreamStateLoginPinRequest(val pinIncorrect: Boolean): StreamState()
 
-class StreamSession(val connectInfo: ConnectInfo, val logManager: LogManager, val logVerbose: Boolean, val input: StreamInput)
+class StreamSession(val context: Context, val connectInfo: ConnectInfo, val logManager: LogManager, val logVerbose: Boolean, val input: StreamInput)
 {
+	// DUALPLAY: efectos de gatillo hacia el DualSense (solo si se activó en Ajustes).
+	private var triggerFeedback: TriggerFeedback? = null
+
 	var session: Session? = null
 		private set
 
@@ -40,6 +47,8 @@ class StreamSession(val connectInfo: ConnectInfo, val logManager: LogManager, va
 
 	fun shutdown()
 	{
+		triggerFeedback?.clearAndClose()
+		triggerFeedback = null
 		session?.stop()
 		session?.dispose()
 		session = null
@@ -61,6 +70,8 @@ class StreamSession(val connectInfo: ConnectInfo, val logManager: LogManager, va
 			val session = Session(connectInfo, logManager.createNewFile().file.absolutePath, logVerbose)
 			_state.value = StreamStateConnecting
 			session.eventCallback = this::eventCallback
+			if(connectInfo.enableDualSense && triggerFeedback == null)
+				triggerFeedback = TriggerFeedback(context)
 			session.start()
 			val surface = surface
 			if(surface != null)
@@ -90,6 +101,11 @@ class StreamSession(val connectInfo: ConnectInfo, val logManager: LogManager, va
 				)
 			)
 			is RumbleEvent -> _rumbleState.postValue(event)
+			is TriggerEffectsEvent -> {
+				Log.i("DualPlay", "Efectos de gatillo de la PS5: izq=0x%02x der=0x%02x (feedback ${if(triggerFeedback != null) "activo" else "desactivado"})".format(event.typeLeft, event.typeRight))
+				triggerFeedback?.onTriggerEffects(
+				TriggerEffects(TriggerEffect(event.typeLeft, event.left), TriggerEffect(event.typeRight, event.right)))
+			}
 		}
 	}
 
