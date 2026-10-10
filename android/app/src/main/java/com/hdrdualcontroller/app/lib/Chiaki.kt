@@ -97,6 +97,9 @@ private class ChiakiNative
 		@JvmStatic external fun sessionSetSurface(ptr: Long, surface: Surface?)
 		@JvmStatic external fun sessionSetControllerState(ptr: Long, controllerState: ControllerState)
 		@JvmStatic external fun sessionSetLoginPin(ptr: Long, pin: String)
+		@JvmStatic external fun sessionMicConnect(ptr: Long) // DUALPLAY
+		@JvmStatic external fun sessionMicToggle(ptr: Long, muted: Boolean) // DUALPLAY
+		@JvmStatic external fun sessionMicFrame(ptr: Long, pcm: ShortArray) // DUALPLAY
 		@JvmStatic external fun discoveryServiceCreate(result: CreateResult, options: DiscoveryServiceOptions, javaService: DiscoveryService)
 		@JvmStatic external fun discoveryServiceFree(ptr: Long)
 		@JvmStatic external fun discoveryServiceWakeup(ptr: Long, host: String, userCredential: Long, ps5: Boolean)
@@ -415,6 +418,26 @@ class Session(connectInfo: ConnectInfo, logFile: String?, logVerbose: Boolean)
 	fun setLoginPin(pin: String)
 	{
 		ChiakiNative.sessionSetLoginPin(nativePtr, pin)
+	}
+
+	// DUALPLAY: micrófono. `muted` de micToggle es el estado ACTUAL antes de conmutar (como el escritorio).
+	fun micConnect()
+	{
+		if(nativePtr != 0L)
+			ChiakiNative.sessionMicConnect(nativePtr)
+	}
+
+	fun micToggle(muted: Boolean)
+	{
+		if(nativePtr != 0L)
+			ChiakiNative.sessionMicToggle(nativePtr, muted)
+	}
+
+	/** 960 `short`: 480 muestras estéreo intercaladas a 48 kHz. */
+	fun micFrame(pcm: ShortArray)
+	{
+		if(nativePtr != 0L)
+			ChiakiNative.sessionMicFrame(nativePtr, pcm)
 	}
 }
 

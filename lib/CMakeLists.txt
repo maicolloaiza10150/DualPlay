@@ -113,8 +113,12 @@ set_source_files_properties(${CHIAKI_LIB_PROTO_SOURCE_FILES} ${CHIAKI_LIB_PROTO_
 include_directories("${CHIAKI_LIB_PROTO_INCLUDE_DIR}")
 
 if(CHIAKI_LIB_ENABLE_OPUS)
-	find_package(Opus REQUIRED)
-	include_directories(${Opus_INCLUDE_DIRS})
+	if(CHIAKI_LIB_OPUS_EXTERNAL_PROJECT) # DUALPLAY
+		include_directories("${OPUS_PREFIX_INCLUDE_DIR}")
+	else()
+		find_package(Opus REQUIRED)
+		include_directories(${Opus_INCLUDE_DIRS})
+	endif()
 endif()
 
 add_library(chiaki-lib ${HEADER_FILES} ${SOURCE_FILES} ${CHIAKI_LIB_PROTO_SOURCE_FILES} ${CHIAKI_LIB_PROTO_HEADER_FILES})
@@ -217,7 +221,11 @@ if(CHIAKI_ENABLE_PI_DECODER)
 endif()
 
 if(CHIAKI_LIB_ENABLE_OPUS)
-	target_link_libraries(chiaki-lib ${Opus_LIBRARIES})
+	if(CHIAKI_LIB_OPUS_EXTERNAL_PROJECT) # DUALPLAY
+		target_link_libraries(chiaki-lib opus)
+	else()
+		target_link_libraries(chiaki-lib ${Opus_LIBRARIES})
+	endif()
 endif()
 
 #set(CMAKE_C_FLAGS "${CMAKE_C_FLAGS} -fanalyzer")

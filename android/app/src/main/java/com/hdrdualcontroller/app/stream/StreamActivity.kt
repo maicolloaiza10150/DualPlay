@@ -2,6 +2,7 @@
 
 package com.hdrdualcontroller.app.stream
 
+import android.Manifest
 import android.animation.Animator
 import android.animation.AnimatorListenerAdapter
 import android.app.AlertDialog
@@ -14,6 +15,9 @@ import androidx.core.content.IntentCompat
 import androidx.lifecycle.lifecycleScope
 import androidx.core.view.ViewCompat
 import android.content.pm.ActivityInfo
+import android.content.pm.PackageManager
+import android.widget.Toast
+import androidx.activity.result.contract.ActivityResultContracts
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
@@ -124,6 +128,19 @@ class StreamActivity : AppCompatActivity()
 
 		//viewModel.session.attachToTextureView(textureView)
 		viewModel.session.attachToSurfaceView(binding.surfaceView)
+		binding.micSwitch.setOnCheckedChangeListener { _, isChecked ->
+			if(isChecked)
+			{
+				if(checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
+					applyMicrophone(true)
+				else
+					micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+			}
+			else
+				viewModel.session.setMicrophoneEnabled(false)
+			showOverlay()
+		}
+
 		// DUALPLAY: el touchpad del DualSense llega como puntero; con la captura no sale el cursor y entrega los dedos.
 		binding.surfaceView.isFocusable = true
 		binding.surfaceView.isFocusableInTouchMode = true
@@ -149,6 +166,26 @@ class StreamActivity : AppCompatActivity()
 
 	private var controlsJob: Job? = null
 
+	// DUALPLAY: micrófono del teléfono para el chat de voz de la PS5
+	private val micPermissionLauncher = registerForActivityResult(ActivityResultContracts.RequestPermission()) { granted ->
+		if(granted)
+			applyMicrophone(true)
+		else
+		{
+			binding.micSwitch.isChecked = false
+			Toast.makeText(this, R.string.stream_microphone_denied, Toast.LENGTH_LONG).show()
+		}
+	}
+
+	private fun applyMicrophone(enabled: Boolean)
+	{
+		if(!viewModel.session.setMicrophoneEnabled(enabled) && enabled)
+		{
+			binding.micSwitch.isChecked = false
+			Toast.makeText(this, R.string.stream_microphone_failed, Toast.LENGTH_LONG).show()
+		}
+	}
+
 	override fun onAttachFragment(fragment: Fragment)
 	{
 		super.onAttachFragment(fragment)
@@ -167,6 +204,7 @@ class StreamActivity : AppCompatActivity()
 	override fun onResume()
 	{
 		super.onResume()
+		binding.micSwitch.isChecked = false // la sesión arranca con el micrófono silenciado
 		hideSystemUI()
 		viewModel.session.resume()
 	}

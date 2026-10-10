@@ -204,6 +204,8 @@ class StreamInput(val context: Context, val preferences: Preferences)
 	 */
 	fun onCapturedPointerEvent(event: MotionEvent): Boolean
 	{
+		if(event.actionMasked != MotionEvent.ACTION_MOVE) // las posiciones llegan a ~100 Hz: solo se registran los cambios de dedo/botón
+			Log.i("DualPlay", "Touchpad (puntero capturado): acción=${MotionEvent.actionToString(event.action)} fuente=0x%x dedos=${event.pointerCount} botones=${event.buttonState} x=%.0f y=%.0f".format(event.source, event.x, event.y))
 		if(!event.isFromSource(InputDevice.SOURCE_TOUCHPAD))
 			return false
 		val xRange = event.device?.getMotionRange(MotionEvent.AXIS_X, InputDevice.SOURCE_TOUCHPAD)

@@ -29,6 +29,12 @@ class StreamSession(val context: Context, val connectInfo: ConnectInfo, val logM
 	private var triggerFeedback: TriggerFeedback? = null
 	private var hapticLogged = false
 
+	// DUALPLAY: micrófono del teléfono -> PS5. La sesión arranca silenciada (la lib manda dos toggle(false) al conectar).
+	private var micCapture: MicrophoneCapture? = null
+	private var micConnected = false
+	var micMuted = true
+		private set
+
 	var session: Session? = null
 		private set
 
@@ -47,8 +53,47 @@ class StreamSession(val context: Context, val connectInfo: ConnectInfo, val logM
 		}
 	}
 
+	/**
+	 * Activa o silencia el micrófono. Mismo orden que el escritorio (gui/src/streamsession.cpp, ToggleMute): la primera vez
+	 * se conecta el canal del micrófono y siempre se envía toggle con el estado de mute ACTUAL. Devuelve false si no hay
+	 * sesión o no se pudo abrir el micrófono (falta el permiso RECORD_AUDIO u otra app lo tiene).
+	 */
+	fun setMicrophoneEnabled(enabled: Boolean): Boolean
+	{
+		val session = session ?: return false
+		if(enabled == !micMuted)
+			return true
+		if(enabled)
+		{
+			val capture = MicrophoneCapture { pcm -> this.session?.micFrame(pcm) }
+			if(!capture.start(context))
+				return false
+			micCapture = capture
+			if(!micConnected)
+			{
+				session.micConnect()
+				micConnected = true
+			}
+			session.micToggle(true)
+			micMuted = false
+		}
+		else
+		{
+			micCapture?.stop()
+			micCapture = null
+			session.micToggle(false)
+			micMuted = true
+		}
+		Log.i("DualPlay", "Micrófono: ${if(micMuted) "silenciado" else "activo"}")
+		return true
+	}
+
 	fun shutdown()
 	{
+		micCapture?.stop()
+		micCapture = null
+		micConnected = false
+		micMuted = true
 		triggerFeedback?.clearAndClose()
 		triggerFeedback = null
 		session?.stop()

@@ -84,6 +84,10 @@
     <string name="developer_motion_spike_title">SPIKE E: controller gyro</string>
     <string name="developer_motion_spike_summary">Reads the controller motion sensors and shows live values</string>
 
+    <string name="stream_microphone">Microphone</string>
+    <string name="stream_microphone_denied">Microphone permission denied</string>
+    <string name="stream_microphone_failed">Could not start the microphone</string>
+
     <string name="developer_category_title">Developer</string>
     <string name="developer_dualsense_spike_title">DualSense USB spike</string>
     <string name="developer_bluetooth_spike_title">DualSense Bluetooth spike</string>

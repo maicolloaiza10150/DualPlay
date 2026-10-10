@@ -9,6 +9,7 @@
 #include <chiaki/session.h>
 #include <chiaki/discoveryservice.h>
 #include <chiaki/regist.h>
+#include <chiaki/opusencoder.h> // DUALPLAY: micrófono
 
 #include <string.h>
 #include <pthread.h>
@@ -137,6 +138,7 @@ typedef struct android_chiaki_session_t
 	jmethodID java_session_event_rumble_meth;
 	jmethodID java_session_event_trigger_effects_meth; // DUALPLAY
 	jmethodID java_session_event_haptic_rumble_meth; // DUALPLAY
+	ChiakiOpusEncoder mic_encoder; // DUALPLAY: micrófono del teléfono -> PS5 (48 kHz estéreo, frames de 10 ms)
 	// DUALPLAY: rumble emulado desde la háptica de la PS5 (se promedian 3 paquetes de 10 ms, como chiaki-ng de escritorio)
 	uint32_t haptic_sum;
 	int haptic_count;
@@ -479,6 +481,14 @@ JNIEXPORT void JNICALL JNI_FCN(sessionCreate)(JNIEnv *env, jobject obj, jobject 
 	session->java_controller_touch_y = E->GetFieldID(env, controller_touch_class, "y", "S");
 	session->java_controller_touch_id = E->GetFieldID(env, controller_touch_class, "id", "B");
 
+	// DUALPLAY: codificador del micrófono, como el de escritorio (gui/src/streamsession.cpp): 2 canales, 16 bits, 48 kHz, 480 muestras
+	chiaki_opus_encoder_init(&session->mic_encoder, log);
+	{
+		ChiakiAudioHeader mic_header;
+		chiaki_audio_header_set(&mic_header, 2, 16, 48000, 480);
+		chiaki_opus_encoder_header(&mic_header, &session->mic_encoder, &session->session);
+	}
+
 	chiaki_session_set_event_cb(&session->session, android_chiaki_event_cb, session);
 	chiaki_session_set_video_sample_cb(&session->session, android_chiaki_video_decoder_video_sample, &session->video_decoder);
 
@@ -513,6 +523,7 @@ JNIEXPORT void JNICALL JNI_FCN(sessionFree)(JNIEnv *env, jobject obj, jlong ptr)
 	if(!session)
 		return;
 	CHIAKI_LOGI(session->log, "Shutting down JNI Session");
+	chiaki_opus_encoder_fini(&session->mic_encoder); // DUALPLAY
 	chiaki_session_fini(&session->session);
 	android_chiaki_video_decoder_fini(&session->video_decoder);
 	android_chiaki_audio_decoder_fini(&session->audio_decoder);
@@ -593,6 +604,30 @@ JNIEXPORT void JNICALL JNI_FCN(sessionSetControllerState)(JNIEnv *env, jobject o
 	controller_state.orient_z = E->GetFloatField(env, controller_state_java, session->java_controller_state_orient_z);
 	controller_state.orient_w = E->GetFloatField(env, controller_state_java, session->java_controller_state_orient_w);
 	chiaki_session_set_controller_state(&session->session, &controller_state);
+}
+
+// DUALPLAY: micrófono. Mismo orden que gui/src/streamsession.cpp: connect una vez y luego toggle(estado ACTUAL de mute).
+JNIEXPORT void JNICALL JNI_FCN(sessionMicConnect)(JNIEnv *env, jobject obj, jlong ptr)
+{
+	AndroidChiakiSession *session = (AndroidChiakiSession *)ptr;
+	chiaki_session_connect_microphone(&session->session);
+}
+
+JNIEXPORT void JNICALL JNI_FCN(sessionMicToggle)(JNIEnv *env, jobject obj, jlong ptr, jboolean muted)
+{
+	AndroidChiakiSession *session = (AndroidChiakiSession *)ptr;
+	chiaki_session_toggle_microphone(&session->session, muted);
+}
+
+// 480 muestras x 2 canales int16 intercaladas (10 ms a 48 kHz).
+JNIEXPORT void JNICALL JNI_FCN(sessionMicFrame)(JNIEnv *env, jobject obj, jlong ptr, jshortArray pcm)
+{
+	AndroidChiakiSession *session = (AndroidChiakiSession *)ptr;
+	int16_t buf[960];
+	if(E->GetArrayLength(env, pcm) < 960)
+		return;
+	E->GetShortArrayRegion(env, pcm, 0, 960, buf);
+	chiaki_opus_encoder_frame(buf, &session->mic_encoder);
 }
 
 JNIEXPORT void JNICALL JNI_FCN(sessionSetLoginPin)(JNIEnv *env, jobject obj, jlong ptr, jstring pin_java)

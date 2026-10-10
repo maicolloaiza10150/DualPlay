@@ -59,6 +59,11 @@ CHIAKI_EXPORT void chiaki_opus_encoder_header(ChiakiAudioHeader *header, ChiakiO
 		return;
 	}
 
+	// DUALPLAY: la PS5 exige paquetes de exactamente 40 bytes por frame de 10 ms (ver audiosender.c, buf_size_per_unit).
+	// Con la tasa por defecto (VBR) Opus devuelve tamaños variables y el frame se descarta; CBR a 32 kbps da 40 bytes fijos.
+	opus_encoder_ctl(encoder->opus_encoder, OPUS_SET_BITRATE(32000));
+	opus_encoder_ctl(encoder->opus_encoder, OPUS_SET_VBR(0));
+
 	CHIAKI_LOGI(encoder->log, "ChiakiOpusEncoder initialized");
 
 	size_t opus_frame_buf_size_required = 40;

@@ -36,6 +36,7 @@ tri_option(CHIAKI_USE_SYSTEM_JERASURE "Use system-provided jerasure instead of s
 tri_option(CHIAKI_USE_SYSTEM_NANOPB "Use system-provided nanopb instead of submodule" AUTO)
 tri_option(CHIAKI_USE_SYSTEM_CURL "Use system-provided curl instead of submodule. Has to be built with experimental WebSocket support!" OFF)
 option(CHIAKI_LIB_JSONC_EXTERNAL_PROJECT "Build json-c from source via FetchContent" OFF)
+option(CHIAKI_LIB_OPUS_EXTERNAL_PROJECT "Build Opus from source via FetchContent" OFF) # DUALPLAY
 option(CHIAKI_LIB_MINIUPNPC_EXTERNAL_PROJECT "Build miniupnpc from source via FetchContent" OFF)
 
 set(CHIAKI_VERSION_MAJOR 1)
@@ -199,6 +200,11 @@ endif()
 
 if(CHIAKI_LIB_MINIUPNPC_EXTERNAL_PROJECT)
 	include(MiniupnpcExternalProject)
+endif()
+
+# DUALPLAY: Opus desde fuente (micrófono en Android)
+if(CHIAKI_LIB_ENABLE_OPUS AND CHIAKI_LIB_OPUS_EXTERNAL_PROJECT)
+	include(OpusExternalProject)
 endif()
 
 add_subdirectory(lib)
