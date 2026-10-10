@@ -65,7 +65,7 @@ class StreamSession(val context: Context, val connectInfo: ConnectInfo, val logM
 			return true
 		if(enabled)
 		{
-			val capture = MicrophoneCapture { pcm -> this.session?.micFrame(pcm) }
+			val capture = MicrophoneCapture(Preferences(context).micGainPercent / 100f) { pcm -> this.session?.micFrame(pcm) }
 			if(!capture.start(context))
 				return false
 			micCapture = capture

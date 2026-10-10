@@ -84,6 +84,10 @@
     <string name="developer_motion_spike_title">SPIKE E: controller gyro</string>
     <string name="developer_motion_spike_summary">Reads the controller motion sensors and shows live values</string>
 
+    <string name="preferences_mic_gain_key">mic_gain</string>
+    <string name="preferences_mic_gain_title">Microphone volume</string>
+    <string name="preferences_mic_gain_value">%d%%</string>
+    <string name="stream_overlay_open">Open stream options</string>
     <string name="stream_microphone">Microphone</string>
     <string name="stream_microphone_denied">Microphone permission denied</string>
     <string name="stream_microphone_failed">Could not start the microphone</string>

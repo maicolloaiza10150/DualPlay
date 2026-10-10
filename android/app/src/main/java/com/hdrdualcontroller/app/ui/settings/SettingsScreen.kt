@@ -91,6 +91,8 @@ fun SettingsScreen(
 	var dualsenseFeatures by remember { mutableStateOf(prefs.dualsenseFeatures) }
 	var hdHaptics by remember { mutableStateOf(prefs.hdHaptics) }
 	var hdSingle by remember { mutableStateOf(prefs.hdHapticsSingleBlock) }
+	var micGain by remember { mutableStateOf(prefs.micGainPercent) }
+	var showMicGain by remember { mutableStateOf(false) }
 	var hdGain by remember { mutableStateOf(prefs.hdHapticsGainPercent) }
 	var showHdGain by remember { mutableStateOf(false) }
 	var hdBuffer by remember { mutableStateOf(prefs.hdHapticsBuffer) }
@@ -198,6 +200,7 @@ fun SettingsScreen(
 			SwitchItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_single_title, R.string.preferences_hd_haptics_single_summary, hdSingle) {
 				hdSingle = it; prefs.hdHapticsSingleBlock = it
 			}
+			ClickItem(R.drawable.ic_gamepad, R.string.preferences_mic_gain_title, stringResource(R.string.preferences_mic_gain_value, micGain)) { showMicGain = true }
 			SwitchItem(R.drawable.ic_log, R.string.preferences_log_verbose_title, R.string.preferences_log_verbose_summary, logVerbose) {
 				logVerbose = it; prefs.logVerbose = it
 			}
@@ -254,6 +257,10 @@ fun SettingsScreen(
 		ChoiceDialog(
 			R.string.preferences_hd_haptics_buffer_title, listOf(16, 24, 32, 48, 64), hdBuffer,
 			{ stringResource(R.string.preferences_hd_haptics_buffer_value, it) }, { showHdBuffer = false }) { hdBuffer = it; prefs.hdHapticsBuffer = it }
+	if(showMicGain)
+		ChoiceDialog(
+			R.string.preferences_mic_gain_title, listOf(100, 200, 300, 400, 600, 800), micGain,
+			{ stringResource(R.string.preferences_mic_gain_value, it) }, { showMicGain = false }) { micGain = it; prefs.micGainPercent = it }
 	if(showBitrate)
 		BitrateDialog(bitrate, bitrateAuto, { showBitrate = false }) {
 			prefs.bitrate = it

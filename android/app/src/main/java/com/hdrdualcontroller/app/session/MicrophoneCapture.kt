@@ -11,6 +11,7 @@ import android.media.AudioManager
 import android.media.AudioRecord
 import android.media.MediaRecorder
 import android.media.audiofx.AcousticEchoCanceler
+import android.media.audiofx.AutomaticGainControl
 import android.media.audiofx.NoiseSuppressor
 import android.os.Process
 import android.util.Log
@@ -24,13 +25,18 @@ import android.util.Log
  * sistema, y además se piden explícitamente `AcousticEchoCanceler` y `NoiseSuppressor` si existen (el juego suena por
  * los altavoces del teléfono y se colaría en el micrófono).
  */
-class MicrophoneCapture(private val onFrame: (ShortArray) -> Unit)
+class MicrophoneCapture(
+	/** Multiplicador digital de la señal (1.0 = tal cual). Se satura en int16. */
+	private val gain: Float = 1f,
+	private val onFrame: (ShortArray) -> Unit
+)
 {
 	private var record: AudioRecord? = null
 	private var thread: Thread? = null
 	@Volatile private var running = false
 	private var echoCanceler: AcousticEchoCanceler? = null
 	private var noiseSuppressor: NoiseSuppressor? = null
+	private var gainControl: AutomaticGainControl? = null
 
 	/** false si falta el permiso o no se pudo abrir el micrófono. */
 	fun start(context: Context): Boolean
@@ -63,7 +69,9 @@ class MicrophoneCapture(private val onFrame: (ShortArray) -> Unit)
 				echoCanceler = AcousticEchoCanceler.create(rec.audioSessionId)?.also { it.enabled = true }
 			if(NoiseSuppressor.isAvailable())
 				noiseSuppressor = NoiseSuppressor.create(rec.audioSessionId)?.also { it.enabled = true }
-			Log.i(TAG, "Micrófono: eco=${echoCanceler != null} ruido=${noiseSuppressor != null} dispositivo=${rec.routedDevice?.productName}")
+			if(AutomaticGainControl.isAvailable())
+				gainControl = AutomaticGainControl.create(rec.audioSessionId)?.also { it.enabled = true }
+			Log.i(TAG, "Micrófono: eco=${echoCanceler != null} ruido=${noiseSuppressor != null} agc=${gainControl != null} ganancia=$gain dispositivo=${rec.routedDevice?.productName}")
 
 			rec.startRecording()
 			record = rec
@@ -86,6 +94,7 @@ class MicrophoneCapture(private val onFrame: (ShortArray) -> Unit)
 		val mono = ShortArray(FRAME_SAMPLES)
 		val stereo = ShortArray(FRAME_SAMPLES * 2)
 		var frames = 0L
+		var peak = 0 // pico de los últimos ~5 s, para ajustar la ganancia
 		while(running)
 		{
 			var filled = 0
@@ -103,12 +112,20 @@ class MicrophoneCapture(private val onFrame: (ShortArray) -> Unit)
 				break
 			for(i in 0 until FRAME_SAMPLES)
 			{
-				stereo[i * 2] = mono[i]
-				stereo[i * 2 + 1] = mono[i]
+				val s = (mono[i] * gain).toInt().coerceIn(-32768, 32767).toShort()
+				stereo[i * 2] = s
+				stereo[i * 2 + 1] = s
+				val abs = if(s < 0) -s.toInt() else s.toInt()
+				if(abs > peak) peak = abs
 			}
 			onFrame(stereo)
 			if(++frames == 1L)
 				Log.i(TAG, "Micrófono: primer frame enviado")
+			if(frames % 500L == 0L)
+			{
+				Log.i(TAG, "Micrófono [5 s]: pico=%.1f%% ganancia=%.2f".format(peak * 100.0 / 32768, gain))
+				peak = 0
+			}
 		}
 	}
 
@@ -119,6 +136,7 @@ class MicrophoneCapture(private val onFrame: (ShortArray) -> Unit)
 		thread = null
 		echoCanceler?.release(); echoCanceler = null
 		noiseSuppressor?.release(); noiseSuppressor = null
+		gainControl?.release(); gainControl = null
 		record?.let {
 			try { it.stop() } catch(_: IllegalStateException) {}
 			it.release()

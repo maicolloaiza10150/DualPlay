@@ -53,6 +53,7 @@ class StreamActivity : AppCompatActivity()
 	{
 		const val EXTRA_CONNECT_INFO = "connect_info"
 		private const val HIDE_UI_TIMEOUT_MS = 2000L
+		private const val OVERLAY_MENU_TIMEOUT_MS = 8000L // overlay abierto con el botón: da tiempo a tocar un interruptor
 	}
 
 	private lateinit var viewModel: StreamViewModel
@@ -91,7 +92,9 @@ class StreamActivity : AppCompatActivity()
 		insetsController.systemBarsBehavior = WindowInsetsControllerCompat.BEHAVIOR_SHOW_TRANSIENT_BARS_BY_SWIPE
 
 		ViewCompat.setOnApplyWindowInsetsListener(window.decorView) { _, insets ->
-			val systemBars = insets.isVisible(WindowInsetsCompat.Type.systemBars())
+			// DUALPLAY: isVisible(systemBars()) exige que TODAS las barras estén visibles; con navegación por gestos la
+			// barra inferior casi nunca lo está y el overlay no salía al deslizar. Basta con que se vea alguna.
+			val systemBars = insets.isVisible(WindowInsetsCompat.Type.statusBars()) || insets.isVisible(WindowInsetsCompat.Type.navigationBars())
 			if(systemBars)
 				showOverlay()
 			else
@@ -128,6 +131,10 @@ class StreamActivity : AppCompatActivity()
 
 		//viewModel.session.attachToTextureView(textureView)
 		viewModel.session.attachToSurfaceView(binding.surfaceView)
+		binding.overlayHandle.setOnClickListener {
+			overlayTimeoutMs = OVERLAY_MENU_TIMEOUT_MS
+			showOverlay()
+		}
 		binding.micSwitch.setOnCheckedChangeListener { _, isChecked ->
 			if(isChecked)
 			{
@@ -229,6 +236,9 @@ class StreamActivity : AppCompatActivity()
 
 	private val hideSystemUIRunnable = Runnable { hideSystemUI() }
 
+	private var overlayTimeoutMs = HIDE_UI_TIMEOUT_MS
+	private val hideOverlayRunnable = Runnable { hideOverlay() }
+
 	private fun showOverlay()
 	{
 		binding.overlay.isVisible = true
@@ -242,11 +252,15 @@ class StreamActivity : AppCompatActivity()
 				}
 			})
 		uiVisibilityHandler.removeCallbacks(hideSystemUIRunnable)
-		uiVisibilityHandler.postDelayed(hideSystemUIRunnable, HIDE_UI_TIMEOUT_MS)
+		uiVisibilityHandler.postDelayed(hideSystemUIRunnable, overlayTimeoutMs)
+		// Si las barras del sistema ya estaban ocultas no hay cambio de insets que oculte el overlay: se oculta por tiempo.
+		uiVisibilityHandler.removeCallbacks(hideOverlayRunnable)
+		uiVisibilityHandler.postDelayed(hideOverlayRunnable, overlayTimeoutMs)
 	}
 
 	private fun hideOverlay()
 	{
+		overlayTimeoutMs = HIDE_UI_TIMEOUT_MS
 		binding.overlay.animate()
 			.alpha(0.0f)
 			.setListener(object: AnimatorListenerAdapter()

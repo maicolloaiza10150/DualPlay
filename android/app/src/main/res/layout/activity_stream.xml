@@ -128,4 +128,16 @@
 
 </androidx.constraintlayout.widget.ConstraintLayout>
 
+    <!-- DUALPLAY: botón fijo para abrir el overlay sin depender del gesto de deslizar desde el borde -->
+    <ImageButton
+        android:id="@+id/overlayHandle"
+        android:layout_width="48dp"
+        android:layout_height="40dp"
+        android:layout_gravity="top|center_horizontal"
+        android:layout_marginTop="4dp"
+        android:alpha="0.35"
+        android:background="@drawable/stream_overlay_handle_background"
+        android:contentDescription="@string/stream_overlay_open"
+        android:src="@drawable/ic_gamepad" />
+
 </FrameLayout>

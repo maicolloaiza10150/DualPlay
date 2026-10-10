@@ -127,6 +127,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getString(buttonRemapKey, "") ?: ""
 		set(value) { sharedPreferences.edit().putString(buttonRemapKey, value).apply() }
 
+	// DUALPLAY: ganancia digital del micrófono del teléfono en % (100 = sin cambios).
+	val micGainKey get() = resources.getString(R.string.preferences_mic_gain_key)
+	var micGainPercent
+		get() = sharedPreferences.getInt(micGainKey, 300).coerceIn(50, 800)
+		set(value) { sharedPreferences.edit().putInt(micGainKey, value.coerceIn(50, 800)).apply() }
+
 	val logVerboseKey get() = resources.getString(R.string.preferences_log_verbose_key)
 	var logVerbose
 		get() = sharedPreferences.getBoolean(logVerboseKey, false)
