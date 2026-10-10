@@ -73,7 +73,8 @@ fun SettingsScreen(
 	onOpenButtonMapping: () -> Unit,
 	onPsnLogin: () -> Unit,
 	onOpenDualSenseSpike: () -> Unit,
-	onOpenBluetoothSpike: () -> Unit
+	onOpenBluetoothSpike: () -> Unit,
+	onOpenMotionSpike: () -> Unit
 )
 {
 	val context = LocalContext.current
@@ -228,6 +229,7 @@ fun SettingsScreen(
 				Section(R.string.developer_category_title)
 				ClickItem(R.drawable.ic_gamepad, R.string.developer_dualsense_spike_title, stringResource(R.string.developer_dualsense_spike_summary), onOpenDualSenseSpike)
 				ClickItem(R.drawable.ic_gamepad, R.string.developer_bluetooth_spike_title, stringResource(R.string.developer_bluetooth_spike_summary), onOpenBluetoothSpike)
+				ClickItem(R.drawable.ic_motion, R.string.developer_motion_spike_title, stringResource(R.string.developer_motion_spike_summary), onOpenMotionSpike)
 			}
 		}
 	}

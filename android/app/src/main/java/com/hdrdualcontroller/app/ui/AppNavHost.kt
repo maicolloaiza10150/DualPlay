@@ -8,6 +8,7 @@ import androidx.navigation.NavType
 import androidx.navigation.compose.NavHost
 import androidx.navigation.compose.composable
 import com.hdrdualcontroller.app.ui.settings.ButtonMappingScreen
+import com.hdrdualcontroller.app.ui.spike.MotionSpikeScreen
 import androidx.navigation.compose.rememberNavController
 import androidx.navigation.navArgument
 import com.hdrdualcontroller.app.ui.main.MainScreen
@@ -33,6 +34,7 @@ private object Routes
 	const val PSN_LOGIN = "psn"
 	const val SPIKE_DUALSENSE = "spike/dualsense"
 	const val SPIKE_BLUETOOTH = "spike/bluetooth"
+	const val SPIKE_MOTION = "spike/motion"
 	const val MANUAL = "manual?id={id}"
 	const val REGIST = "regist?host={host}&manualId={manualId}"
 	const val REGIST_EXECUTE = "regist/execute"
@@ -69,7 +71,12 @@ fun AppNavHost()
 				onOpenButtonMapping = { navController.navigate(Routes.BUTTON_MAPPING) },
 				onPsnLogin = { navController.navigate(Routes.PSN_LOGIN) },
 				onOpenDualSenseSpike = { navController.navigate(Routes.SPIKE_DUALSENSE) },
-				onOpenBluetoothSpike = { navController.navigate(Routes.SPIKE_BLUETOOTH) })
+				onOpenBluetoothSpike = { navController.navigate(Routes.SPIKE_BLUETOOTH) },
+				onOpenMotionSpike = { navController.navigate(Routes.SPIKE_MOTION) })
+		}
+
+		composable(Routes.SPIKE_MOTION) {
+			MotionSpikeScreen(onBack = { navController.popBackStack() })
 		}
 
 		composable(Routes.SPIKE_BLUETOOTH) {

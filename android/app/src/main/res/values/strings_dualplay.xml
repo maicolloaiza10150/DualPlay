@@ -81,6 +81,9 @@
     <string name="ps_button_dpad_left">D-pad left</string>
     <string name="ps_button_dpad_right">D-pad right</string>
 
+    <string name="developer_motion_spike_title">SPIKE E: controller gyro</string>
+    <string name="developer_motion_spike_summary">Reads the controller motion sensors and shows live values</string>
+
     <string name="developer_category_title">Developer</string>
     <string name="developer_dualsense_spike_title">DualSense USB spike</string>
     <string name="developer_bluetooth_spike_title">DualSense Bluetooth spike</string>

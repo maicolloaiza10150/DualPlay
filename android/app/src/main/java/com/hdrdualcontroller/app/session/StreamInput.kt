@@ -8,7 +8,9 @@ import androidx.lifecycle.LifecycleObserver
 import androidx.lifecycle.LifecycleOwner
 import androidx.lifecycle.OnLifecycleEvent
 import com.hdrdualcontroller.app.common.Preferences
+import android.util.Log
 import com.hdrdualcontroller.app.input.ButtonMapping
+import com.hdrdualcontroller.app.input.OrientationTracker
 import com.hdrdualcontroller.app.lib.ControllerState
 
 class StreamInput(val context: Context, val preferences: Preferences)
@@ -21,7 +23,7 @@ class StreamInput(val context: Context, val preferences: Preferences)
 
 		val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 		@Suppress("DEPRECATION")
-		when(windowManager.defaultDisplay.rotation)
+		when(if(usingControllerSensors) Surface.ROTATION_0 else windowManager.defaultDisplay.rotation) // los ejes del control no dependen de la pantalla
 		{
 			Surface.ROTATION_90 -> {
 				controllerState.accelX *= -1.0f
@@ -57,6 +59,44 @@ class StreamInput(val context: Context, val preferences: Preferences)
 		}
 
 	private val buttonMapping = ButtonMapping.parse(preferences.buttonRemap, preferences.swapCrossMoon)
+
+	// DUALPLAY: sensores del propio control (SPIKE E: Android expone "<control> Motion Sensors" del DualSense con
+	// InputDevice.getSensorManager, a ~87 Hz por Bluetooth). Acelerómetro en m/s² y giroscopio en rad/s, con ejes ya en la
+	// convención de la PS5 (en reposo plano la gravedad cae en +Y); la orientación sale del filtro de Madgwick de la lib.
+	@Volatile private var usingControllerSensors = false
+	private val orientationTracker = OrientationTracker()
+	private val lastAccelG = FloatArray(3)
+
+	private fun findControllerSensorManager(): SensorManager? =
+		InputDevice.getDeviceIds().toList()
+			.mapNotNull { InputDevice.getDevice(it) }
+			.firstOrNull { it.vendorId == VENDOR_SONY && it.sensorManager.getDefaultSensor(Sensor.TYPE_GYROSCOPE) != null && it.sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER) != null }
+			?.sensorManager
+
+	private val controllerSensorListener = object: SensorEventListener {
+		override fun onSensorChanged(event: SensorEvent)
+		{
+			when(event.sensor.type)
+			{
+				Sensor.TYPE_ACCELEROMETER -> for(i in 0..2) lastAccelG[i] = event.values[i] / SensorManager.GRAVITY_EARTH
+				Sensor.TYPE_GYROSCOPE -> {
+					// El giroscopio marca el ritmo: cada muestra de giro actualiza el filtro con el último acelerómetro.
+					orientationTracker.update(
+						event.values[0], event.values[1], event.values[2],
+						lastAccelG[0], lastAccelG[1], lastAccelG[2], event.timestamp / 1000)
+					sensorControllerState.run {
+						gyroX = orientationTracker.gyroX; gyroY = orientationTracker.gyroY; gyroZ = orientationTracker.gyroZ
+						accelX = orientationTracker.accelX; accelY = orientationTracker.accelY; accelZ = orientationTracker.accelZ
+						orientX = orientationTracker.orientX; orientY = orientationTracker.orientY
+						orientZ = orientationTracker.orientZ; orientW = orientationTracker.orientW
+					}
+					controllerStateUpdated()
+				}
+			}
+		}
+
+		override fun onAccuracyChanged(sensor: Sensor, accuracy: Int) {}
+	}
 
 	private val sensorEventListener = object: SensorEventListener {
 		override fun onSensorChanged(event: SensorEvent)
@@ -94,6 +134,19 @@ class StreamInput(val context: Context, val preferences: Preferences)
 		fun onResume()
 		{
 			val samplingPeriodUs = 4000
+			val controllerSensors = findControllerSensorManager()
+			if(controllerSensors != null)
+			{
+				usingControllerSensors = true
+				Log.i("DualPlay", "Movimiento: sensores del control")
+				listOfNotNull(
+					controllerSensors.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
+					controllerSensors.getDefaultSensor(Sensor.TYPE_GYROSCOPE)
+				).forEach { controllerSensors.registerListener(controllerSensorListener, it, samplingPeriodUs) }
+				return
+			}
+			usingControllerSensors = false
+			Log.i("DualPlay", "Movimiento: sensores del teléfono")
 			val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 			listOfNotNull(
 				sensorManager.getDefaultSensor(Sensor.TYPE_ACCELEROMETER),
@@ -109,6 +162,7 @@ class StreamInput(val context: Context, val preferences: Preferences)
 		{
 			val sensorManager = context.getSystemService(Context.SENSOR_SERVICE) as SensorManager
 			sensorManager.unregisterListener(sensorEventListener)
+			findControllerSensorManager()?.unregisterListener(controllerSensorListener)
 		}
 	}
 
@@ -216,5 +270,10 @@ class StreamInput(val context: Context, val preferences: Preferences)
 		//Log.i("StreamSession", "motionEvent => $motionControllerState")
 		controllerStateUpdated()
 		return true
+	}
+
+	private companion object
+	{
+		const val VENDOR_SONY = 0x054c
 	}
 }
