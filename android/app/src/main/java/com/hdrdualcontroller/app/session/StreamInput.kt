@@ -17,7 +17,7 @@ class StreamInput(val context: Context, val preferences: Preferences)
 
 	val controllerState: ControllerState get()
 	{
-		val controllerState = sensorControllerState or keyControllerState or motionControllerState
+		val controllerState = sensorControllerState or keyControllerState or motionControllerState or padControllerState
 
 		val windowManager = context.getSystemService(Context.WINDOW_SERVICE) as WindowManager
 		@Suppress("DEPRECATION")
@@ -47,6 +47,8 @@ class StreamInput(val context: Context, val preferences: Preferences)
 	private val sensorControllerState = ControllerState() // from Motion Sensors
 	private val keyControllerState = ControllerState() // from KeyEvents
 	private val motionControllerState = ControllerState() // from MotionEvents
+	private val padControllerState = ControllerState() // from the DualSense touchpad (captured pointer)
+	private val padTouchIds = HashMap<Int, UByte>() // id del puntero de Android -> id de toque de PlayStation
 	var touchControllerState = ControllerState()
 		set(value)
 		{
@@ -137,6 +139,50 @@ class StreamInput(val context: Context, val preferences: Preferences)
 			else -> keyControllerState.buttons = keyControllerState.buttons.let { if(down) it or target.mask else it and target.mask.inv() }
 		}
 
+		controllerStateUpdated()
+		return true
+	}
+
+	/**
+	 * DUALPLAY: touchpad del DualSense. Con la captura de puntero activa, Android entrega el touchpad como SOURCE_TOUCHPAD
+	 * con la posición ABSOLUTA de cada dedo (View.requestPointerCapture) y deja de dibujar el cursor. La posición se
+	 * escala del rango del dispositivo a la del touchpad de PlayStation (1920x942) y el clic va en buttonState.
+	 */
+	fun onCapturedPointerEvent(event: MotionEvent): Boolean
+	{
+		if(!event.isFromSource(InputDevice.SOURCE_TOUCHPAD))
+			return false
+		val xRange = event.device?.getMotionRange(MotionEvent.AXIS_X, InputDevice.SOURCE_TOUCHPAD)
+		val yRange = event.device?.getMotionRange(MotionEvent.AXIS_Y, InputDevice.SOURCE_TOUCHPAD)
+		fun scale(value: Float, min: Float, max: Float, size: UShort): UShort
+		{
+			val span = max - min
+			val f = if(span > 0f) ((value - min) / span).coerceIn(0f, 1f) else 0f
+			return (f * (size.toInt() - 1)).toInt().toUShort()
+		}
+		fun posX(index: Int) = scale(event.getX(index), xRange?.min ?: 0f, xRange?.max ?: ControllerState.TOUCHPAD_WIDTH.toFloat(), ControllerState.TOUCHPAD_WIDTH)
+		fun posY(index: Int) = scale(event.getY(index), yRange?.min ?: 0f, yRange?.max ?: ControllerState.TOUCHPAD_HEIGHT.toFloat(), ControllerState.TOUCHPAD_HEIGHT)
+
+		when(event.actionMasked)
+		{
+			MotionEvent.ACTION_DOWN, MotionEvent.ACTION_POINTER_DOWN -> {
+				val index = event.actionIndex
+				padControllerState.startTouch(posX(index), posY(index))?.let { padTouchIds[event.getPointerId(index)] = it }
+			}
+			MotionEvent.ACTION_MOVE -> {
+				for(index in 0 until event.pointerCount)
+					padTouchIds[event.getPointerId(index)]?.let { padControllerState.setTouchPos(it, posX(index), posY(index)) }
+			}
+			MotionEvent.ACTION_UP, MotionEvent.ACTION_POINTER_UP -> {
+				padTouchIds.remove(event.getPointerId(event.actionIndex))?.let { padControllerState.stopTouch(it) }
+			}
+			MotionEvent.ACTION_CANCEL -> {
+				padTouchIds.values.forEach { padControllerState.stopTouch(it) }
+				padTouchIds.clear()
+			}
+		}
+		padControllerState.buttons =
+			if(event.buttonState and MotionEvent.BUTTON_PRIMARY != 0) ControllerState.BUTTON_TOUCHPAD else 0U
 		controllerStateUpdated()
 		return true
 	}

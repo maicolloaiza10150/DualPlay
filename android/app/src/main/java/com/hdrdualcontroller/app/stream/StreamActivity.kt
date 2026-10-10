@@ -124,6 +124,10 @@ class StreamActivity : AppCompatActivity()
 
 		//viewModel.session.attachToTextureView(textureView)
 		viewModel.session.attachToSurfaceView(binding.surfaceView)
+		// DUALPLAY: el touchpad del DualSense llega como puntero; con la captura no sale el cursor y entrega los dedos.
+		binding.surfaceView.isFocusable = true
+		binding.surfaceView.isFocusableInTouchMode = true
+		binding.surfaceView.setOnCapturedPointerListener { _, event -> viewModel.input.onCapturedPointerEvent(event) }
 		viewModel.session.state.observe(this, Observer { this.stateChanged(it) })
 		adjustStreamViewAspect()
 
@@ -220,7 +224,13 @@ class StreamActivity : AppCompatActivity()
 	{
 		super.onWindowFocusChanged(hasFocus)
 		if(hasFocus)
+		{
 			hideSystemUI()
+			binding.surfaceView.requestFocus()
+			binding.surfaceView.requestPointerCapture()
+		}
+		else
+			binding.surfaceView.releasePointerCapture()
 	}
 
 	private fun hideSystemUI()
