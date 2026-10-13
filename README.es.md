@@ -48,7 +48,7 @@ Requisitos: JDK 17, Android SDK con NDK `28.2.13676358` (fijado en `android/app/
 `python3` con el módulo `protobuf`, `git`, `make`, `perl`.
 
 ```bash
-git clone --recursive https://github.com/<tu-usuario>/DualPlay.git
+git clone --recursive https://github.com/maicolloaiza10150/DualPlay.git
 cd DualPlay/android
 ./gradlew :app:assembleDebug          # solo arm64-v8a
 ./gradlew :app:testDebugUnitTest      # tests JVM (parsers, constructores de reportes, asignación de botones)
