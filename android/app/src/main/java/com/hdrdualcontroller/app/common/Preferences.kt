@@ -82,6 +82,11 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getInt(touchControlsOpacityKey, 100).coerceIn(20, 100)
 		set(value) { sharedPreferences.edit().putInt(touchControlsOpacityKey, value.coerceIn(20, 100)).apply() }
 
+	// DUALPLAY: la guía de primer arranque se muestra una sola vez.
+	var onboardingDone
+		get() = sharedPreferences.getBoolean("onboarding_done", false)
+		set(value) { sharedPreferences.edit().putBoolean("onboarding_done", value).apply() }
+
 	val rumbleEnabledKey get() = resources.getString(R.string.preferences_rumble_enabled_key)
 	var rumbleEnabled
 		get() = sharedPreferences.getBoolean(rumbleEnabledKey, true)

@@ -23,9 +23,13 @@ import com.hdrdualcontroller.app.ui.settings.SettingsScreen
 import com.hdrdualcontroller.app.ui.spike.DualSenseBluetoothSpikeScreen
 import com.hdrdualcontroller.app.ui.spike.DualSenseSpikeScreen
 import android.net.Uri
+import androidx.compose.ui.platform.LocalContext
+import com.hdrdualcontroller.app.common.Preferences
+import com.hdrdualcontroller.app.ui.onboarding.OnboardingScreen
 
 private object Routes
 {
+	const val ONBOARDING = "onboarding"
 	const val MAIN = "main"
 	const val SETTINGS = "settings"
 	const val REGISTERED_HOSTS = "settings/hosts"
@@ -44,6 +48,7 @@ private object Routes
 fun AppNavHost()
 {
 	val navController = rememberNavController()
+	val prefs = Preferences(LocalContext.current)
 	// Ámbito de la actividad: lleva el formulario de registro a la pantalla de ejecución.
 	val registFlow: RegistFlowViewModel = viewModel()
 
@@ -52,8 +57,19 @@ fun AppNavHost()
 		navController.navigate("regist?host=${Uri.encode(host ?: "")}&manualId=${manualId ?: -1L}")
 	}
 
-	NavHost(navController, startDestination = Routes.MAIN)
+	NavHost(navController, startDestination = if(prefs.onboardingDone) Routes.MAIN else Routes.ONBOARDING)
 	{
+		composable(Routes.ONBOARDING) {
+			OnboardingScreen(
+				onPsnLogin = { navController.navigate(Routes.PSN_LOGIN) },
+				onFinish = { registerNow ->
+					prefs.onboardingDone = true
+					navController.navigate(Routes.MAIN) { popUpTo(Routes.ONBOARDING) { inclusive = true } }
+					if(registerNow)
+						openRegist(null, null)
+				})
+		}
+
 		composable(Routes.MAIN) {
 			MainScreen(
 				onOpenSettings = { navController.navigate(Routes.SETTINGS) },

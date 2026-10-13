@@ -33,28 +33,28 @@
     <string name="preferences_codec_title_h265_hdr">H265 HDR (PS5 only, HDR10 display)</string>
     <string name="stream_hdr_unavailable">HDR is not available on this phone or display. Using H265 SDR.</string>
 
-    <string name="preferences_dualsense_features_key">dualsense_features</string>
+    <string name="preferences_dualsense_features_key" translatable="false">dualsense_features</string>
     <string name="preferences_dualsense_features_title">DualSense adaptive triggers</string>
     <string name="preferences_dualsense_features_summary">Send the trigger effects of the game to a DualSense over Bluetooth. Needs the Bluetooth permission and the controller connected as an input device. May change how rumble is delivered.</string>
     <string name="preferences_dualsense_features_denied">Bluetooth permission denied; adaptive triggers stay off.</string>
 
-    <string name="preferences_hd_haptics_key">hd_haptics</string>
+    <string name="preferences_hd_haptics_key" translatable="false">hd_haptics</string>
     <string name="preferences_hd_haptics_title">HD haptics (experimental)</string>
     <string name="preferences_hd_haptics_summary">Send the real haptic signal of the game to the DualSense over Bluetooth instead of a simple rumble. Needs adaptive triggers enabled.</string>
 
-    <string name="preferences_hd_haptics_gain_key">hd_haptics_gain</string>
+    <string name="preferences_hd_haptics_gain_key" translatable="false">hd_haptics_gain</string>
     <string name="preferences_hd_haptics_gain_title">HD haptics strength</string>
     <string name="preferences_hd_haptics_gain_value">%d%%</string>
 
-    <string name="preferences_hd_haptics_buffer_key">hd_haptics_buffer</string>
+    <string name="preferences_hd_haptics_buffer_key" translatable="false">hd_haptics_buffer</string>
     <string name="preferences_hd_haptics_buffer_title">HD haptics delay</string>
     <string name="preferences_hd_haptics_buffer_value">%d (lower = less delay, may cut out)</string>
 
-    <string name="preferences_hd_haptics_single_key">hd_haptics_single</string>
+    <string name="preferences_hd_haptics_single_key" translatable="false">hd_haptics_single</string>
     <string name="preferences_hd_haptics_single_title">HD haptics: small packets</string>
     <string name="preferences_hd_haptics_single_summary">Send smaller packets twice as often (less delay). Turn off if the vibration cuts out.</string>
 
-    <string name="preferences_button_remap_key">button_remap</string>
+    <string name="preferences_button_remap_key" translatable="false">button_remap</string>
     <string name="preferences_button_remap_title">Button mapping</string>
     <string name="preferences_button_remap_summary">Choose which controller button does what. Works with extra buttons and paddles.</string>
     <string name="remap_press_prompt">Press the controller button you want to use for %1$s</string>
@@ -84,7 +84,7 @@
     <string name="developer_motion_spike_title">SPIKE E: controller gyro</string>
     <string name="developer_motion_spike_summary">Reads the controller motion sensors and shows live values</string>
 
-    <string name="preferences_mic_gain_key">mic_gain</string>
+    <string name="preferences_mic_gain_key" translatable="false">mic_gain</string>
     <string name="preferences_mic_gain_title">Microphone volume</string>
     <string name="preferences_mic_gain_value">%d%%</string>
     <string name="stream_overlay_open">Open stream options</string>
@@ -147,5 +147,23 @@
     <string name="stream_error_lost_body">The stream was interrupted. Check your Wi-Fi (5 GHz works best) and reconnect.</string>
     <string name="stream_error_generic_title">Could not play</string>
     <string name="stream_error_generic_body">Something went wrong while connecting. You can try again. If it keeps happening, share the session log from Settings.</string>
-    <string name="preferences_touch_controls_opacity_key">touch_controls_opacity</string>
+    <string name="preferences_touch_controls_opacity_key" translatable="false">touch_controls_opacity</string>
+
+    <!-- First run -->
+    <string name="onboarding_skip">Skip</string>
+    <string name="onboarding_next">Next</string>
+    <string name="onboarding_later">Not now</string>
+    <string name="onboarding_welcome_title">Welcome to DualPlay</string>
+    <string name="onboarding_welcome_body">Play your PS5 or PS4 from this phone, with HDR, adaptive triggers and HD haptics on a DualSense. Keep the phone and the console on the same Wi-Fi network; 5 GHz is best.</string>
+    <string name="onboarding_psn_title">Sign in to PSN</string>
+    <string name="onboarding_psn_body">Signing in fills in your Account ID when you register a console, so you do not have to look it up. Only the Account ID is stored, encrypted on this phone. You can skip this and enter it by hand.</string>
+    <string name="onboarding_psn_done">Signed in</string>
+    <string name="onboarding_permissions_title">Permissions</string>
+    <string name="onboarding_permissions_body">Bluetooth lets DualPlay send adaptive trigger effects and HD haptics to a DualSense paired with this phone. The microphone lets you use voice chat with the phone\'s mic. Both are optional and can be changed later.</string>
+    <string name="onboarding_permission_bluetooth">Bluetooth</string>
+    <string name="onboarding_permission_microphone">Microphone</string>
+    <string name="onboarding_permission_allow">Allow %s</string>
+    <string name="onboarding_permission_granted">%s allowed</string>
+    <string name="onboarding_register_title">Register your console</string>
+    <string name="onboarding_register_body">On the PS5 open Settings → System → Remote Play → Link Device to get an 8-digit PIN, then enter it here. You only need to do this once per console.</string>
 </resources>
