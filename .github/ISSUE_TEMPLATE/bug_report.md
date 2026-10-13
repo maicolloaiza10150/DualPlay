@@ -1,36 +1,30 @@
 ---
-name: Bug report
-about: Create a report to help us improve
-title: "[BUG]"
-labels: ''
-assignees: ''
+name: Bug report / Reporte de error
+about: Something does not work in DualPlay
+title: "[BUG] "
+labels: bug
+assignees: ""
 
 ---
 
-**Describe the bug**
-A clear and concise description of what the bug is.
+**What happened? / ¿Qué pasó?**
 
-**Debug Log**
-Please attach a log with verbose logging enabled.
+**What did you expect? / ¿Qué esperabas?**
 
-**To Reproduce**
-Steps to reproduce the behavior:
-1. Go to '...'
-2. Click on '....'
-3. Scroll down to '....'
-4. See error
+**Steps to reproduce / Pasos para reproducirlo**
+1.
+2.
 
-**Expected behavior**
-A clear and concise description of what you expected to happen.
+**Setup / Equipo**
+- Phone model and Android version / Teléfono y versión de Android:
+- DualPlay version / Versión de DualPlay:
+- Console (PS5/PS4) and system software version / Consola y versión del sistema:
+- Controller (DualSense over Bluetooth, Xbox, ...) / Mando:
+- Network (Wi-Fi 5 GHz / 2.4 GHz / Internet) / Red:
 
-**Screenshots**
-If applicable, add screenshots to help explain your problem.
+**Session log / Registro de sesión**
+Settings → Advanced → Session logs → share. Logs are redacted, but **read the file before attaching it**, and never post
+an exported settings file: it can contain your Remote Play keys.
 
-**Desktop (please complete the following information):**
- - OS: [e.g. SteamOS]
- - Version [e.g. 22]
- - Device [e.g. Steam Deck]
- - chiaki-ng Version [e.g. 1.6.2]
-
-**Additional context**
-Add any other context about the problem here.
+Ajustes → Avanzado → Registros de sesión → compartir. Los registros están redactados, pero **revisa el archivo antes de
+adjuntarlo** y nunca publiques el archivo de ajustes exportado: puede contener tus claves de Remote Play.

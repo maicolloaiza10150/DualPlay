@@ -1,151 +1,114 @@
 # Arquitectura de DualPlay
 
+Estado a **v0.1.0-alpha**. Este documento describe cómo está montado el código hoy y por qué. Las limitaciones están en
+[LIMITACIONES.md](LIMITACIONES.md) y la lista de pruebas en [CHECKLIST-PRUEBAS.md](CHECKLIST-PRUEBAS.md).
+
 ## 1. Visión general
 
 ```
- PS5 ──(Wi-Fi 5 GHz / Internet)──▶ lib/ (chiaki-ng, C)
-                                     │  sesión, cifrado, takion, video, audio,
-                                     │  eventos: rumble, trigger effects, haptics
-                                     ▼
-                              JNI bridge (C++)
-          ┌──────────────┬───────────┴──────────┬────────────────────┐
-          ▼              ▼                      ▼                    ▼
-   VideoPipeline    AudioPipeline        FeedbackRouter         InputRouter
-   (MediaCodec,     (Oboe/AAudio,        (decide a dónde         (InputDevice →
-    SurfaceView,     baja latencia)       va cada efecto)        ChiakiControllerState)
-    HDR10)                                  │        │                 ▲
-                                            ▼        ▼                 │
-                                   DualSenseUsb   RumbleFallback   ControllerProfiles
-                                   (gatillos +    (VibratorManager  (DualSense, Xbox,
-                                    háptica HD)    del control)      8BitDo, genéricos)
+ PS5/PS4 ──(Wi-Fi)──▶ lib/ (chiaki-ng, C)
+                        │  sesión, cifrado, takion, FEC, video, audio,
+                        │  eventos: rumble, efectos de gatillo, háptica, micrófono (Opus)
+                        ▼
+                 JNI bridge (C/C++)  android/app/src/main/cpp/
+       ┌───────────────┬──────────────┴───────────┬───────────────────────┐
+       ▼               ▼                          ▼                       ▼
+  video-decoder    audio-output              Session (Kotlin)        micrófono
+  (AMediaCodec,    (Oboe/AAudio,             StreamSession.kt        MicrophoneCapture →
+   SurfaceView)     baja latencia)                │                  Opus (lib/) → PS5
+                                                  ▼
+                                   ┌──────────────┴───────────────┐
+                                   ▼                              ▼
+                            StreamInput                     TriggerFeedback
+                            (InputDevice, remapeo,          (efectos de gatillo + háptica HD)
+                             touchpad, gyro)                        │
+                                                                    ▼
+                                                     DualSenseBluetoothSender
+                                                     (BluetoothHidHost.sendData, API oculta)
 ```
 
 Principio: `lib/` produce datos y eventos; Kotlin decide cómo presentarlos según el hardware conectado.
 
-## 2. Módulos
+## 2. Estructura del código
 
-### 2.1 Puente JNI (`app/src/main/cpp/`)
-- Envuelve `ChiakiSession`: iniciar/detener, enviar estado del control, recibir callbacks.
-- Reenvía a Kotlin, sin bloquear el hilo de red de lib/:
-  - frames de video (NAL units) → `VideoPipeline`
-  - audio PCM decodificado (Opus) → `AudioPipeline`
-  - eventos de rumble, trigger effects y el stream de háptica → `FeedbackRouter`
-- Verifica los nombres reales de structs y eventos en `lib/include/chiaki/` (p. ej. el evento de efectos
-  de gatillo y el sink de háptica) antes de escribir el puente. No asumas nombres.
-- Usa colas sin bloqueo (ring buffers) entre hilos; nada de llamadas JNI por cada muestra de audio.
+Paquete: `com.hdrdualcontroller.app` (el nombre visible es «DualPlay»; el identificador no cambia porque cambiaría la firma y
+los nombres JNI).
 
-### 2.2 VideoPipeline (HDR)
-- Pedir a la PS5 el perfil HEVC con HDR (revisar el enum de códecs en lib/; chiaki-ng desktop ya lo usa).
-- `MediaCodec` con `MIMETYPE_VIDEO_HEVC`, perfil Main10 HDR10. Fallback automático: HEVC SDR → H.264.
-- Salida a `SurfaceView` (NO `TextureView`, que convierte a SDR).
-- Activar `window.colorMode = ActivityInfo.COLOR_MODE_HDR` solo si `Display.hdrCapabilities` reporta HDR10.
-- Baja latencia: `KEY_LOW_LATENCY = 1`, `KEY_PRIORITY = 0`, renderizar el frame apenas sale del decodificador.
-- `Surface.setFrameRate(60f, ...)` para que la pantalla de 120 Hz no produzca judder con un stream de 60 fps.
-- Opción de usuario: HDR on/off y, en una fase posterior, un shader de debanding para SDR (opcional).
+| Ruta | Contenido |
+|------|-----------|
+| `lib/` | Librería C de chiaki-ng (upstream). Cambios mínimos, marcados con `// DUALPLAY:` |
+| `android/app/src/main/cpp/` | Puente JNI. Única capa que incluye headers de `lib/` |
+| `.../session/` | `StreamSession` (ciclo de vida de la sesión), `StreamInput`, `MicrophoneCapture` |
+| `.../stream/` | `StreamActivity` (SurfaceView + controles táctiles), `HdrSupport`, `StreamErrors` |
+| `.../input/` | `ButtonMapping` (tabla tecla → botón PS, remapeo), `OrientationTracker` (gyro, Madgwick) |
+| `.../dualsense/` | Todo lo específico del DualSense: envío por Bluetooth, háptica HD, efectos de gatillo, USB (solo debug) |
+| `.../ui/` | Pantallas Compose: principal, ajustes, registro, PSN, primer arranque, overlay del stream |
+| `.../ui/theme/` | `DualPlayTheme`: paleta azul PlayStation (tokens en `DualPlayColors`) |
+| `.../touchcontrols/` | Controles táctiles en pantalla (Views heredadas, restilizadas) |
+| `.../common/`, `.../psn/` | Preferencias, base de datos (Room), logs redactados, login PSN y almacenamiento cifrado |
 
-### 2.3 AudioPipeline
-- Oboe en modo `LowLatency`, `Exclusive` cuando se pueda.
-- Si la salida es Bluetooth, mostrar aviso de latencia y permitir compensación de A/V.
+## 3. Vídeo y audio
 
-### 2.4 InputRouter + ControllerProfiles (controles de terceros)
-- Leer `KeyEvent`/`MotionEvent` de cualquier `InputDevice` con `SOURCE_GAMEPAD` o `SOURCE_JOYSTICK`.
-- Detectar DualSense por vendorId `0x054C` (DualSense y DualSense Edge) y aplicar perfil nativo.
-- Perfiles predefinidos: Xbox, 8BitDo, Switch Pro, genérico. Remapeo editable por el usuario (DataStore).
-- Mapeo de botones de Xbox/Nintendo a la cara de PlayStation, incluyendo opción de intercambiar A/B.
-- Touchpad: zona táctil en pantalla o botón asignable. Gyro: sensores del control (`InputDevice.sensorManager`)
-  o del teléfono como respaldo.
-- Rumble para terceros: `InputDevice.vibratorManager` (Android 12+).
+- **Vídeo:** siempre `MediaCodec` por hardware (NDK `AMediaCodec` en `video-decoder.c`), nunca FFmpeg por software.
+  HEVC Main10 HDR10 si la pantalla lo soporta (`HdrSupport.adjust`), con caída a HEVC SDR y H.264. La salida va a un
+  `SurfaceView` (no `TextureView`, que convertiría a SDR) y la ventana usa `COLOR_MODE_HDR` solo con un stream HDR.
+  Baja latencia: `KEY_LOW_LATENCY`, `KEY_PRIORITY = 0`.
+- **Audio:** Oboe/AAudio en modo `LowLatency`.
+- **Micrófono:** `AudioRecord` con cancelación de eco → ganancia → codificador Opus de la lib (paquetes de 40 bytes, CBR) →
+  PS5. El micrófono arranca siempre silenciado.
 
-### 2.5 FeedbackRouter
-Decide la ruta de cada efecto según la conexión del control:
+## 4. DualSense
 
-| Efecto              | DualSense por USB-C        | DualSense por Bluetooth   | Control de terceros |
-|---------------------|----------------------------|---------------------------|---------------------|
-| Gatillos adaptativos| Sí (DualSenseUsb)          | Sí (BluetoothHidHost, §4) | No aplica           |
-| Háptica HD          | SPIKE (DualSenseUsb)       | Rumble emulado            | Rumble emulado      |
-| Rumble básico       | Sí                         | Sí                        | Sí                  |
+### Gatillos adaptativos y háptica HD por Bluetooth (sin root, sin cable)
+- `DualSenseBluetoothSender` envía output reports con `BluetoothHidHost.sendData(device, hex)`. La API es **oculta**:
+  se alcanza con `hiddenapibypass`. Solo exige `BLUETOOTH_CONNECT` y que el mando esté conectado como dispositivo de entrada,
+  así que Android sigue entregando los botones como `InputDevice`.
+- Cualquier fallo se captura, se registra una vez y deja el sender inutilizable sin afectar al stream (degradación limpia).
+- **Gatillos:** la PS5 manda tipo + 10 bytes por gatillo; `TriggerFeedback` los reenvía tal cual dentro del reporte de salida.
+- **Háptica HD:** la PS5 manda PCM estéreo a 3 kHz. `HdHapticsStreamer` lo reempaqueta en reportes `0x32` (1 bloque de 32
+  muestras int8 cada 10,7 ms) o `0x39` (2 bloques cada 21,3 ms). Antes de cada vibración se envía un `0x31` de estado
+  (filtro paso-bajo apagado, potencia sin reducir). Ajustes avanzados: intensidad, retardo (búfer del mando), paquetes pequeños.
+- Los formatos de reportes se verificaron contra el código de escritorio de chiaki-ng y el driver `hid-playstation` de Linux;
+  cada offset lleva su fuente en un comentario. `OutputReportBuilder` es Kotlin puro con tests JVM.
+- Se descartó el Bluetooth clásico por L2CAP (el mando usa ERTM). USB-C (`DualSenseUsbTransport`, SPIKE A) funciona, pero queda
+  solo como herramienta de desarrollo en builds de depuración.
 
-`RumbleFallback` convierte el stream de háptica en intensidades de motor (envolvente de amplitud por canal),
-igual que el "emulated haptic rumble" de chiaki-ng desktop.
+### Resto de funciones del mando
+- **Touchpad:** captura de puntero en `StreamActivity`; los toques absolutos van a la PS5.
+- **Gyro:** Android expone los sensores del DualSense (`InputDevice.sensorManager`, ~87 Hz). `OrientationTracker` es un port
+  Kotlin del filtro Madgwick de `lib/src/orientation.c`; si el mando no los expone, se usan los del teléfono.
+- **Remapeo:** `ButtonMapping` traduce `KeyEvent` a botones PS con una tabla editable por el usuario (extra buttons, paletas).
 
-### 2.6 DualSenseUsb (gatillos + háptica HD)
-- Pedir permiso con `UsbManager.requestPermission`; detectar conexión/desconexión con un BroadcastReceiver.
-- `DualSenseUsbTransport`: única clase que abre `UsbDeviceConnection` y envía reportes. Limitar la tasa
-  de envío y fusionar estados (el último efecto gana).
-- `OutputReportBuilder` (Kotlin puro, con tests JVM): construye el output report USB con flags de validez,
-  motores, efectos de gatillo izquierdo/derecho y luces. Fuentes para verificar formato y offsets:
-  el código de escritorio de chiaki-ng y el driver `hid-playstation` de Linux.
-- **SPIKE A – envío sin perder input nativo**: probar primero `controlTransfer` (SET_REPORT) SIN reclamar
-  la interfaz HID, para que Android siga entregando los botones como `InputDevice`.
-  Si no funciona, reclamar la interfaz y leer los input reports directamente (`InputReportParser`, con tests).
-- **SPIKE B – háptica HD**: por USB el DualSense expone una interfaz de audio de 4 canales; los canales 3-4
-  mueven los actuadores. El stream de háptica llega a baja frecuencia y debe remuestrearse a 48 kHz.
-  Estrategia 1: Oboe/AudioTrack con `setPreferredDevice` al dispositivo USB y máscara de 4 canales por índice.
-  Estrategia 2 (si la 1 falla): transferencias isócronas con libusb sobre el file descriptor de `UsbDeviceConnection`.
-  Medir latencia y reportar antes de integrar.
+## 5. Interfaz
 
-## 3. Fases
+Toda la UI es Jetpack Compose salvo los controles táctiles y el `SurfaceView` del stream.
 
-0. **Reconocimiento**: inspeccionar el repo, ubicar el código Android existente (si chiaki-ng no lo mantiene
-   al día, evaluar el de Chiaki original o un fork activo), compilar sin cambios e instalar en el S23 FE.
-1. **Stream básico**: H.264 SDR + audio + DualSense por Bluetooth con input estándar. Registro con PIN de la PS5.
-2. **HDR**: HEVC Main10 + modo HDR de ventana + fallbacks.
-3. **Controles de terceros**: perfiles, remapeo, gyro, rumble por `VibratorManager`.
-4. **Gatillos adaptativos por USB**: SPIKE A → `OutputReportBuilder` → integración.
-5. **Háptica HD por USB**: SPIKE B → integración; `RumbleFallback` para Bluetooth y terceros.
-6. **Pulido S23 FE**: latencia, temperatura (sesiones de 1 h), batería, conexión remota por Internet.
+- Tema oscuro azul PlayStation (`DualPlayTheme`); sin colores sueltos en las pantallas. Zonas táctiles ≥ 48 dp.
+- Principal: tarjetas con estado (lista / en reposo / sin respuesta) y botón **Jugar** / **Despertar** / **Registrar**.
+- Ajustes por secciones: Vídeo, Mando, Audio y micrófono, Cuenta PSN, Avanzado.
+- Stream: `StreamActivity` aloja un `ComposeView` sobre el `SurfaceView` y los controles táctiles. Solo consume toques sobre sus
+  propios elementos (botón fijo de opciones, panel, pantalla de conexión, diálogos). Los errores de la lib se traducen en
+  `StreamErrorKind` (con test JVM) con una acción clara.
+- Primer arranque (`OnboardingScreen`): PSN, permisos explicados antes de pedirlos y registro de consola.
+- Textos en `values/` (inglés) y `values-es/` (español).
 
-## 4. Limitaciones conocidas
+**Pendiente (post v0.1):** pasar los controles táctiles a Compose y quitar AppCompat, Material Components, RecyclerView y
+ViewBinding. Es la pieza de más riesgo de latencia y multitoque y requiere medir contra la referencia de la fase 0.
 
-- Android no permite a una app normal enviar reportes HID arbitrarios a un control conectado por Bluetooth.
-  Gatillos adaptativos y háptica HD requieren cable USB-C. Investigar Shizuku/root solo como opción
-  experimental y desactivada por defecto; nunca como requisito.
-- **SPIKE D (2026-10-09, S23 FE, Android 16): gatillos adaptativos por Bluetooth FUNCIONAN sin root.** Se usa
-  `BluetoothHidHost.sendData(device, hex)` (API oculta, perfil HID_HOST = 4, accesible con `hiddenapibypass`): solo exige
-  BLUETOOTH_CONNECT y que el control esté conectado como "Input device" (verificado en `HidHostService.java` de AOSP).
-  Envía el output report 0x31 (78 bytes, tag 0x10, CRC32 con semilla 0xA2) por el canal interrupt que la pila ya tiene
-  abierto, así que el input sigue llegando como InputDevice. Probado: resistencia constante notada en ambos gatillos.
-  Riesgos: API oculta (puede cambiar en futuras versiones de Android/One UI), requiere `hiddenapibypass`.
-  Esto REEMPLAZA la limitación anterior ("no sin root").
-- **SPIKE C (2026-10-08, S23 FE, Android 16): gatillos por Bluetooth clásico descartados.** Con `hiddenapibypass` la app SÍ puede
-  crear `BluetoothDevice.createInsecureL2capSocket(0x11)` y la pila registra el PSM y conecta con el control (el sistema no
-  bloquea el PSM). Pero la pila de Bluetooth (mainline) crea TODO socket L2CAP clásico con ERTM obligatorio
-  (`btif_sock_l2cap.cc`: `obex_l2c_etm_opt`, "Mandatory for OBEX over l2cap") y el DualSense solo soporta modo básico:
-  `l2c_fcr_chk_chan_modes` aborta con "Peer does not support our desired channel types" antes de enviar nada.
-  No hay opción de app para evitarlo. Vías que quedan: cable USB-C, o un adaptador Bluetooth USB con pila propia
-  (BTstack sobre HCI por USB). El código del spike está en el historial de git (commit f350937c y su revert).
-- DualSense + audífonos Bluetooth + Wi-Fi 2.4 GHz compiten por la misma banda: recomendar Wi-Fi 5 GHz en la UI.
+## 6. Datos sensibles
 
-## 5. Checklist de prueba manual (S23 FE)
+- Tokens PSN, Account ID, claves de registro y PIN **nunca** van al repositorio. El Account ID se guarda en
+  `EncryptedSharedPreferences`; no se guardan tokens (scope `psn:clientapp`).
+- `LogRedactor` quita Session ID, payloads de registro y hexdumps; el nivel VERBOSE nativo nunca se activa en release (`NDEBUG`) y el ajuste solo se muestra en builds de depuración.
+- `allowBackup=false`. El keystore de firma vive fuera del repositorio (`android/local.properties`, ignorado).
 
-- Astro's Playroom (preinstalado en la PS5): gatillos y háptica en el menú y el primer nivel.
-- Un juego con HDR: comparar contra la TV, revisar que negros y brillos no se vean lavados.
-- Control Xbox o 8BitDo: todos los botones, remapeo, rumble.
-- 30 min de sesión: medir temperatura, caídas de frames (overlay de estadísticas) y latencia de input.
+## 7. Historial de fases
 
-## 6. Capa de UI (Compose) y límites de módulos
-
-Detalle de fases en `docs/PLAN-COMPOSE.md`.
-
-```
- ui/ (Compose, Navigation)  ──▶  ViewModels (StateFlow)  ──▶  data/ (Room, DataStore, EncryptedSharedPreferences)
-        │                                │
-        │                                └──▶ psn/ (OAuth: authorization_code → token → Account ID)
-        └── StreamScreen: SurfaceView en AndroidView (nunca TextureView) + controles táctiles con pointerInput
-                                         │
-                                         ▼
-                              stream/ (StreamSession) ──▶ lib/ChiakiNative ──▶ JNI ──▶ lib/ (C)
-```
-
-- La UI no conoce JNI ni `lib/`; solo habla con ViewModels y `stream/`.
-- `psn/` es el único código que maneja tokens; se guardan en `EncryptedSharedPreferences`, nunca en logs.
-- Migración incremental: las Activities XML conviven con Compose hasta la Fase E del plan.
-
-## 7. Política de logs (secretos)
-
-- Nunca se registran en claro: Session ID, regist key, morning, PIN, tokens PSN, Account ID.
-- `lib/`: el Session ID se muestra enmascarado (4 primeros caracteres); los hexdumps de payloads de ctrl
-  van a nivel VERBOSE, no INFO/WARNING. Cambios mínimos marcados `// DUALPLAY:`.
-- Puente JNI: en builds release (`NDEBUG`) el nivel VERBOSE queda desactivado aunque el usuario lo pida.
-- Kotlin: todo log que sale de la app (compartir/exportar) pasa por `LogRedactor`, con tests JVM.
-- Verificación: tras una sesión y un registro, `grep` de los valores reales en logcat y `session_logs` = 0 coincidencias.
+0. **Reconocimiento:** upstream compilado sin cambios en el S23 FE (referencia: 6 min 40 s, 14 frames perdidos de ~24 000, RTT ~3 ms).
+1. **Stream básico y renombrado:** paquete `com.hdrdualcontroller.app`, arm64-v8a, minSdk 31, logs sin secretos.
+2. **UI en Compose:** principal, ajustes, registro, consolas, logs, PSN.
+3. **HDR:** HEVC Main10 con fallback.
+4. **Gatillos adaptativos y háptica HD** por Bluetooth (API oculta).
+5. **Input:** remapeo, touchpad, gyro, micrófono del teléfono.
+6. **v0.1:** tema y nombre DualPlay, pantalla principal con estado, ajustes por secciones, stream (overlay, errores) en Compose,
+   primer arranque, español/inglés, documentación y publicación.

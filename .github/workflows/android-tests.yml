@@ -1,0 +1,30 @@
+name: Android unit tests
+
+# Solo tests JVM (parsers, constructores de reportes HID, asignación de botones, errores del stream).
+# El build nativo completo es pesado y el stream no se puede probar en CI: ver docs/CHECKLIST-PRUEBAS.md.
+on:
+  push:
+    branches: [main]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  jvm-tests:
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v4
+        with:
+          submodules: recursive
+      - uses: actions/setup-java@v4
+        with:
+          distribution: temurin
+          java-version: 17
+      - name: Python protobuf (nanopb genera código en el build de lib/)
+        run: python3 -m pip install --user protobuf grpcio-tools
+      - name: Install NDK and CMake
+        run: |
+          yes | "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" --licenses > /dev/null || true
+          "$ANDROID_HOME/cmdline-tools/latest/bin/sdkmanager" "ndk;28.2.13676358" "cmake;3.22.1"
+      - name: Run unit tests
+        working-directory: android
+        run: ./gradlew :app:testDebugUnitTest --no-daemon

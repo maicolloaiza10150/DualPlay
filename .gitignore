@@ -39,3 +39,8 @@ chiaki.conf
 .cache/
 *.vscode
 site/
+*.keystore
+*.p12
+*.pfx
+*.pem
+/android/local.properties

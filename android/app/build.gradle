@@ -28,8 +28,8 @@ android {
         applicationId "com.hdrdualcontroller.app"
         minSdk 31
         targetSdk 35
-        versionCode 12
-        versionName chiakiVersion
+        versionCode 13
+        versionName "0.1.0-alpha" // DUALPLAY (chiakiVersion es la versión de la lib upstream)
         ndk {
             abiFilters "arm64-v8a"
         }
@@ -101,16 +101,32 @@ android {
         properties.load(propertiesFile.newDataInputStream())
     }
 
+    // DUALPLAY: dos claves distintas. La de depuración (chiaki*) firma los builds debug; la de release (dualplayRelease*) es
+    // propia del proyecto y vive FUERA del repositorio. Ambas se leen de android/local.properties (ignorado por git).
     if(properties.containsKey("chiakiKeystore")) {
-        println("Enabling Local Signing")
-        buildTypes.release.signingConfig = signingConfigs.release
+        println("Enabling Local Signing (debug)")
         buildTypes.debug.signingConfig = signingConfigs.release
         signingConfigs.release.storeFile = file(properties.get("chiakiKeystore"))
         signingConfigs.release.storePassword = properties.get("chiakiKeystorePW")
         signingConfigs.release.keyAlias = properties.get("chiakiKeyAlias")
         signingConfigs.release.keyPassword = properties.get("chiakiKeyPW")
     } else {
-        println("Signing not enabled")
+        println("Debug signing not configured")
+    }
+
+    if(properties.containsKey("dualplayReleaseKeystore")) {
+        println("Enabling release signing with the DualPlay release key")
+        signingConfigs {
+            dualplayRelease {
+                storeFile = file(properties.get("dualplayReleaseKeystore"))
+                storePassword = properties.get("dualplayReleaseKeystorePW")
+                keyAlias = properties.get("dualplayReleaseKeyAlias")
+                keyPassword = properties.get("dualplayReleaseKeyPW")
+            }
+        }
+        buildTypes.release.signingConfig = signingConfigs.dualplayRelease
+    } else {
+        println("Release signing not configured: the release APK will be unsigned")
     }
 }
 

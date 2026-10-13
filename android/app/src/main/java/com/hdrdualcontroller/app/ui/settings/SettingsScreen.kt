@@ -217,9 +217,11 @@ fun SettingsScreen(
 			SwitchItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_single_title, R.string.preferences_hd_haptics_single_summary, hdSingle) {
 				hdSingle = it; prefs.hdHapticsSingleBlock = it
 			}
-			SwitchItem(R.drawable.ic_log, R.string.preferences_log_verbose_title, R.string.preferences_log_verbose_summary, logVerbose) {
-				logVerbose = it; prefs.logVerbose = it
-			}
+			// En release el nivel VERBOSE nativo nunca se activa (NDEBUG), así que el ajuste solo tiene sentido en depuración.
+			if(context.applicationInfo.flags and ApplicationInfo.FLAG_DEBUGGABLE != 0)
+				SwitchItem(R.drawable.ic_log, R.string.preferences_log_verbose_title, R.string.preferences_log_verbose_summary, logVerbose) {
+					logVerbose = it; prefs.logVerbose = it
+				}
 			ClickItem(R.drawable.ic_log, R.string.preferences_logs_title, stringResource(R.string.preferences_logs_summary), onOpenLogs)
 			ClickItem(R.drawable.ic_export, R.string.preferences_export_settings_title, stringResource(R.string.preferences_export_settings_summary)) {
 				context.findActivity()?.let { exportAndShareAllSettings(it, scope) }
