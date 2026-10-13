@@ -3,7 +3,7 @@
 All notable changes to DualPlay. Format based on [Keep a Changelog](https://keepachangelog.com/); versions follow
 [Semantic Versioning](https://semver.org/). DualPlay forks chiaki-ng; upstream changes are tracked in its own history.
 
-## [0.1.0-alpha] — unreleased
+## [0.1.0-alpha] — 2026-10-13
 
 First public version.
 
