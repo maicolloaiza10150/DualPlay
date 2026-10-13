@@ -60,6 +60,7 @@ class StreamActivity : AppCompatActivity()
 	private var micEnabled by mutableStateOf(false)
 	private var displayMode by mutableStateOf(TransformMode.FIT)
 	private var controlsOpacity by mutableIntStateOf(100)
+	private var systemBarsWereHidden = false
 
 	override fun onCreate(savedInstanceState: Bundle?)
 	{
@@ -97,7 +98,10 @@ class StreamActivity : AppCompatActivity()
 			// DUALPLAY: isVisible(systemBars()) exige que TODAS las barras estén visibles; con navegación por gestos la
 			// barra inferior casi nunca lo está y el panel no salía al deslizar. Basta con que se vea alguna.
 			val systemBars = insets.isVisible(WindowInsetsCompat.Type.statusBars()) || insets.isVisible(WindowInsetsCompat.Type.navigationBars())
-			if(systemBars)
+			// Al arrancar las barras están visibles un instante: el panel solo se abre tras haberlas visto ocultas.
+			if(!systemBars)
+				systemBarsWereHidden = true
+			else if(systemBarsWereHidden)
 			{
 				panelOpen = true
 				uiVisibilityHandler.removeCallbacks(hideSystemUIRunnable)

@@ -5,7 +5,11 @@ package com.hdrdualcontroller.app.ui.stream
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.interaction.MutableInteractionSource
+import android.content.res.Configuration
 import androidx.compose.foundation.layout.Arrangement
+import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.verticalScroll
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -171,20 +175,23 @@ private fun OptionsPanel(options: StreamOptions, onClose: () -> Unit, onQuit: ()
 		Modifier
 			.fillMaxSize()
 			.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null, onClick = onClose))
+	val landscape = LocalConfiguration.current.orientation == Configuration.ORIENTATION_LANDSCAPE
 	Box(Modifier.fillMaxSize().windowInsetsPadding(WindowInsets.safeDrawing), contentAlignment = Alignment.BottomCenter)
 	{
 		Surface(
 			modifier = Modifier
-				.widthIn(max = 640.dp)
+				.widthIn(max = if(landscape) 880.dp else 640.dp)
 				.fillMaxWidth()
 				.padding(8.dp)
 				// El panel consume sus propios toques (no cierran).
 				.clickable(interactionSource = remember { MutableInteractionSource() }, indication = null) {},
 			shape = RoundedCornerShape(24.dp),
 			color = MaterialTheme.colorScheme.surfaceContainer.copy(alpha = 0.96f),
+			contentColor = MaterialTheme.colorScheme.onSurface,
 			tonalElevation = 6.dp
 		) {
-			Column(Modifier.padding(horizontal = 20.dp, vertical = 12.dp))
+			// Desplazable: en horizontal la pantalla es baja y el contenido podría no caber.
+			Column(Modifier.verticalScroll(rememberScrollState()).padding(horizontal = 20.dp, vertical = 8.dp))
 			{
 				Row(verticalAlignment = Alignment.CenterVertically)
 				{
@@ -194,40 +201,59 @@ private fun OptionsPanel(options: StreamOptions, onClose: () -> Unit, onQuit: ()
 					TextButton(onClick = onClose, modifier = Modifier.heightIn(min = 48.dp)) { Text(stringResource(R.string.action_done)) }
 				}
 
-				SwitchRow(stringResource(R.string.stream_on_screen_controls), options.onScreenControls, options.onOnScreenControls)
-				SwitchRow(stringResource(R.string.stream_touchpad_only), options.touchpadOnly, options.onTouchpadOnly)
-				SwitchRow(stringResource(R.string.stream_microphone), options.microphone, options.onMicrophone)
-
-				Text(
-					stringResource(R.string.stream_display_mode),
-					style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
-					modifier = Modifier.padding(top = 8.dp))
-				Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp))
+				if(landscape)
+					Row(horizontalArrangement = Arrangement.spacedBy(32.dp))
+					{
+						Column(Modifier.weight(1f)) { PanelToggles(options) }
+						Column(Modifier.weight(1f)) { PanelPicture(options, onQuit) }
+					}
+				else
 				{
-					DisplayModeChip(TransformMode.FIT, R.string.stream_display_fit, options)
-					DisplayModeChip(TransformMode.ZOOM, R.string.stream_display_zoom, options)
-					DisplayModeChip(TransformMode.STRETCH, R.string.stream_display_stretch, options)
-				}
-
-				Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically)
-				{
-					Text(
-						stringResource(R.string.stream_controls_opacity),
-						style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant)
-					Text(
-						"${options.controlsOpacityPercent}%",
-						style = MaterialTheme.typography.labelLarge, modifier = Modifier.weight(1f), textAlign = TextAlign.End)
-				}
-				Slider(
-					value = options.controlsOpacityPercent.toFloat(),
-					onValueChange = { options.onControlsOpacity(it.toInt()) },
-					valueRange = 20f..100f)
-
-				OutlinedButton(onClick = onQuit, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
-					Text(stringResource(R.string.stream_end_session))
+					PanelToggles(options)
+					PanelPicture(options, onQuit)
 				}
 			}
 		}
+	}
+}
+
+@Composable
+private fun PanelToggles(options: StreamOptions)
+{
+	SwitchRow(stringResource(R.string.stream_on_screen_controls), options.onScreenControls, options.onOnScreenControls)
+	SwitchRow(stringResource(R.string.stream_touchpad_only), options.touchpadOnly, options.onTouchpadOnly)
+	SwitchRow(stringResource(R.string.stream_microphone), options.microphone, options.onMicrophone)
+}
+
+@Composable
+private fun PanelPicture(options: StreamOptions, onQuit: () -> Unit)
+{
+	Text(
+		stringResource(R.string.stream_display_mode),
+		style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+		modifier = Modifier.padding(top = 8.dp))
+	Row(Modifier.padding(top = 4.dp), horizontalArrangement = Arrangement.spacedBy(8.dp))
+	{
+		DisplayModeChip(TransformMode.FIT, R.string.stream_display_fit, options)
+		DisplayModeChip(TransformMode.ZOOM, R.string.stream_display_zoom, options)
+		DisplayModeChip(TransformMode.STRETCH, R.string.stream_display_stretch, options)
+	}
+
+	Row(Modifier.padding(top = 8.dp), verticalAlignment = Alignment.CenterVertically)
+	{
+		Text(
+			stringResource(R.string.stream_controls_opacity),
+			style = MaterialTheme.typography.labelLarge, color = MaterialTheme.colorScheme.onSurfaceVariant,
+			modifier = Modifier.weight(1f))
+		Text("${options.controlsOpacityPercent}%", style = MaterialTheme.typography.labelLarge)
+	}
+	Slider(
+		value = options.controlsOpacityPercent.toFloat(),
+		onValueChange = { options.onControlsOpacity(it.toInt()) },
+		valueRange = 20f..100f)
+
+	OutlinedButton(onClick = onQuit, modifier = Modifier.fillMaxWidth().heightIn(min = 48.dp)) {
+		Text(stringResource(R.string.stream_end_session))
 	}
 }
 
