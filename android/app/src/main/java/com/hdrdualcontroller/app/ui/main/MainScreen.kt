@@ -3,10 +3,8 @@
 package com.hdrdualcontroller.app.ui.main
 
 import android.content.Intent
-import android.graphics.Typeface
 import android.widget.Toast
 import androidx.activity.compose.BackHandler
-import androidx.compose.foundation.Image
 import androidx.compose.foundation.background
 import androidx.compose.foundation.clickable
 import androidx.compose.foundation.layout.Arrangement
@@ -16,20 +14,27 @@ import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
+import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.lazy.LazyColumn
-import androidx.compose.foundation.lazy.itemsIndexed
+import androidx.compose.foundation.lazy.items
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.foundation.shape.RoundedCornerShape
+import androidx.compose.material.icons.Icons
+import androidx.compose.material.icons.filled.PlayArrow
 import androidx.compose.material3.AlertDialog
+import androidx.compose.material3.Button
 import androidx.compose.material3.Card
+import androidx.compose.material3.CardDefaults
 import androidx.compose.material3.DropdownMenu
 import androidx.compose.material3.DropdownMenuItem
 import androidx.compose.material3.ExtendedFloatingActionButton
-import androidx.compose.material3.FloatingActionButton
+import androidx.compose.material3.FilledTonalButton
 import androidx.compose.material3.Icon
 import androidx.compose.material3.IconButton
 import androidx.compose.material3.MaterialTheme
+import androidx.compose.material3.OutlinedButton
 import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
@@ -41,18 +46,13 @@ import androidx.compose.runtime.saveable.rememberSaveable
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.layout.ContentScale
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.res.painterResource
 import androidx.compose.ui.res.stringResource
-import androidx.compose.ui.text.font.FontFamily
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.semantics.Role
 import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
-import androidx.compose.ui.unit.sp
 import androidx.lifecycle.compose.LifecycleStartEffect
 import androidx.lifecycle.viewmodel.compose.viewModel
 import com.hdrdualcontroller.app.R
@@ -69,9 +69,27 @@ import com.hdrdualcontroller.app.stream.HdrSupport
 import com.hdrdualcontroller.app.stream.StreamActivity
 import com.hdrdualcontroller.app.ui.AppScaffold
 import com.hdrdualcontroller.app.ui.DrawableIcon
+import com.hdrdualcontroller.app.ui.theme.DualPlayColors
 
-private val condensedMedium = FontFamily(Typeface.create("sans-serif-condensed-medium", Typeface.NORMAL))
-private val condensedLight = FontFamily(Typeface.create("sans-serif-condensed-light", Typeface.NORMAL))
+/** Estado visible de una consola en la tarjeta. */
+private enum class ConsoleStatus(val label: Int, val color: Color)
+{
+	READY(R.string.status_ready, DualPlayColors.Ready),
+	STANDBY(R.string.status_standby, DualPlayColors.Standby),
+	UNKNOWN(R.string.status_unreachable, DualPlayColors.Off),
+	MANUAL(R.string.status_manual, DualPlayColors.Off)
+}
+
+private fun DisplayHost.status() = when
+{
+	this is DiscoveredDisplayHost -> when(discoveredHost.state)
+	{
+		DiscoveryHost.State.READY -> ConsoleStatus.READY
+		DiscoveryHost.State.STANDBY -> ConsoleStatus.STANDBY
+		else -> ConsoleStatus.UNKNOWN
+	}
+	else -> ConsoleStatus.MANUAL
+}
 
 @Composable
 fun MainScreen(
@@ -85,7 +103,7 @@ fun MainScreen(
 	val context = LocalContext.current
 	val viewModel: MainViewModel = viewModel(factory = viewModelFactory { MainViewModel(getDatabase(context), Preferences(context)) })
 
-	// Igual que antes: el descubrimiento solo corre mientras la pantalla está visible.
+	// El descubrimiento solo corre mientras la pantalla está visible.
 	LifecycleStartEffect(viewModel) {
 		viewModel.discoveryManager.resume()
 		onStopOrDispose { viewModel.discoveryManager.pause() }
@@ -95,7 +113,6 @@ fun MainScreen(
 	val discoveryActive by viewModel.discoveryActive.observeAsState(false)
 
 	var fabExpanded by rememberSaveable { mutableStateOf(false) }
-	var standbyHost by remember { mutableStateOf<DisplayHost?>(null) }
 	var hostToDelete by remember { mutableStateOf<ManualDisplayHost?>(null) }
 
 	BackHandler(enabled = fabExpanded) { fabExpanded = false }
@@ -110,27 +127,21 @@ fun MainScreen(
 			Toast.makeText(context, R.string.stream_hdr_unavailable, Toast.LENGTH_LONG).show()
 		val connectInfo = ConnectInfo(host.isPS5, host.host, registeredHost.rpRegistKey, registeredHost.rpKey, profile, Preferences(context).dualsenseFeatures,
 			Preferences(context).dualsenseFeatures && Preferences(context).hdHaptics)
-		context.startActivity(Intent(context, StreamActivity::class.java).putExtra(StreamActivity.EXTRA_CONNECT_INFO, connectInfo))
+		context.startActivity(Intent(context, StreamActivity::class.java)
+			.putExtra(StreamActivity.EXTRA_CONNECT_INFO, connectInfo)
+			// DUALPLAY: nombre visible en la pantalla de conexión.
+			.putExtra(StreamActivity.EXTRA_CONSOLE_NAME, host.name))
 	}
 
 	fun wakeup(host: DisplayHost)
 	{
 		val registeredHost = host.registeredHost ?: return
 		viewModel.discoveryManager.sendWakeup(host.host, registeredHost.rpRegistKey, registeredHost.target.isPS5)
+		Toast.makeText(context, R.string.main_wake_sent, Toast.LENGTH_SHORT).show()
 	}
 
-	fun hostTriggered(host: DisplayHost)
-	{
-		if(host.registeredHost == null)
-		{
-			onRegisterHost(host.host, (host as? ManualDisplayHost)?.manualHost?.id)
-			return
-		}
-		if(host is DiscoveredDisplayHost && host.discoveredHost.state == DiscoveryHost.State.STANDBY)
-			standbyHost = host
-		else
-			connect(host)
-	}
+	fun register(host: DisplayHost)
+		= onRegisterHost(host.host, (host as? ManualDisplayHost)?.manualHost?.id)
 
 	AppScaffold(
 		title = stringResource(R.string.app_name),
@@ -145,50 +156,37 @@ fun MainScreen(
 			}
 		},
 		floatingActionButton = {
-			SpeedDial(
-				expanded = fabExpanded,
-				onToggle = { fabExpanded = !fabExpanded },
-				onAddManual = { fabExpanded = false; onAddManual() },
-				onRegister = { fabExpanded = false; onRegister() })
+			if(hosts.isNotEmpty())
+				AddConsoleMenu(
+					expanded = fabExpanded,
+					onToggle = { fabExpanded = !fabExpanded },
+					onAddManual = { fabExpanded = false; onAddManual() },
+					onRegister = { fabExpanded = false; onRegister() })
 		}
 	) { padding ->
 		Box(Modifier.fillMaxSize().padding(padding))
 		{
 			if(hosts.isEmpty())
-				EmptyInfo(discoveryActive)
+				EmptyState(discoveryActive, onRegister = onRegister, onAddManual = onAddManual)
 			else
 				LazyColumn(
-					contentPadding = PaddingValues(start = 8.dp, end = 8.dp, top = 8.dp, bottom = 120.dp),
-					verticalArrangement = Arrangement.spacedBy(8.dp)
+					contentPadding = PaddingValues(start = 16.dp, end = 16.dp, top = 8.dp, bottom = 112.dp),
+					verticalArrangement = Arrangement.spacedBy(12.dp)
 				) {
-					itemsIndexed(hosts) { _, host ->
+					items(hosts) { host ->
 						HostCard(
 							host = host,
-							onClick = { hostTriggered(host) },
+							onPlay = { connect(host) },
 							onWakeup = { wakeup(host) },
+							onRegister = { register(host) },
 							onEdit = { (host as? ManualDisplayHost)?.let { onEditManual(it.manualHost.id) } },
 							onDelete = { hostToDelete = host as? ManualDisplayHost })
 					}
 				}
 
 			if(fabExpanded)
-				Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.5f)).clickable { fabExpanded = false })
+				Box(Modifier.fillMaxSize().background(Color.Black.copy(alpha = 0.55f)).clickable { fabExpanded = false })
 		}
-	}
-
-	standbyHost?.let { host ->
-		AlertDialog(
-			onDismissRequest = { standbyHost = null },
-			text = { Text(stringResource(R.string.alert_message_standby_wakeup)) },
-			confirmButton = {
-				Row {
-					TextButton(onClick = { standbyHost = null; wakeup(host) }) { Text(stringResource(R.string.action_wakeup)) }
-					TextButton(onClick = { standbyHost = null; connect(host) }) { Text(stringResource(R.string.action_connect_immediately)) }
-				}
-			},
-			dismissButton = {
-				TextButton(onClick = { standbyHost = null }) { Text(stringResource(R.string.action_connect_cancel_connect)) }
-			})
 	}
 
 	hostToDelete?.let { host ->
@@ -207,7 +205,7 @@ fun MainScreen(
 }
 
 @Composable
-private fun SpeedDial(expanded: Boolean, onToggle: () -> Unit, onAddManual: () -> Unit, onRegister: () -> Unit)
+private fun AddConsoleMenu(expanded: Boolean, onToggle: () -> Unit, onAddManual: () -> Unit, onRegister: () -> Unit)
 {
 	Column(horizontalAlignment = Alignment.End, verticalArrangement = Arrangement.spacedBy(12.dp))
 	{
@@ -215,107 +213,112 @@ private fun SpeedDial(expanded: Boolean, onToggle: () -> Unit, onAddManual: () -
 		{
 			ExtendedFloatingActionButton(
 				onClick = onAddManual,
+				containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+				contentColor = MaterialTheme.colorScheme.onSurface,
 				icon = { DrawableIcon(R.drawable.ic_add_manual, null) },
 				text = { Text(stringResource(R.string.action_add_manual)) })
 			ExtendedFloatingActionButton(
 				onClick = onRegister,
+				containerColor = MaterialTheme.colorScheme.surfaceContainerHighest,
+				contentColor = MaterialTheme.colorScheme.onSurface,
 				icon = { DrawableIcon(R.drawable.ic_register, null) },
 				text = { Text(stringResource(R.string.action_register)) })
 		}
-		FloatingActionButton(onClick = onToggle) {
-			DrawableIcon(if(expanded) R.drawable.ic_close else R.drawable.ic_add, null)
-		}
+		ExtendedFloatingActionButton(
+			onClick = onToggle,
+			containerColor = MaterialTheme.colorScheme.primary,
+			contentColor = MaterialTheme.colorScheme.onPrimary,
+			icon = { DrawableIcon(if(expanded) R.drawable.ic_close else R.drawable.ic_add, null) },
+			text = { Text(stringResource(R.string.main_add_console)) })
 	}
 }
 
 @Composable
-private fun EmptyInfo(discoveryActive: Boolean)
+private fun EmptyState(discoveryActive: Boolean, onRegister: () -> Unit, onAddManual: () -> Unit)
 {
 	Column(
-		Modifier.fillMaxSize().padding(32.dp),
+		Modifier.fillMaxSize().padding(horizontal = 32.dp),
 		horizontalAlignment = Alignment.CenterHorizontally,
 		verticalArrangement = Arrangement.Center
 	) {
-		Icon(
-			painterResource(if(discoveryActive) R.drawable.ic_discover_on else R.drawable.ic_discover_off),
-			contentDescription = null,
-			modifier = Modifier.size(96.dp).alpha(0.6f))
+		Box(
+			Modifier.size(96.dp).background(MaterialTheme.colorScheme.primaryContainer, CircleShape),
+			contentAlignment = Alignment.Center
+		) {
+			Icon(
+				androidx.compose.ui.res.painterResource(R.drawable.ic_gamepad), contentDescription = null,
+				tint = MaterialTheme.colorScheme.onPrimaryContainer, modifier = Modifier.size(48.dp))
+		}
 		Text(
-			stringResource(if(discoveryActive) R.string.display_hosts_empty_discovery_on_info else R.string.display_hosts_empty_discovery_off_info),
-			textAlign = TextAlign.Center,
-			modifier = Modifier.padding(top = 16.dp))
+			stringResource(R.string.main_empty_title),
+			style = MaterialTheme.typography.headlineSmall, textAlign = TextAlign.Center,
+			modifier = Modifier.padding(top = 24.dp))
+		Text(
+			stringResource(R.string.main_empty_body),
+			style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+			textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+		Text(
+			stringResource(if(discoveryActive) R.string.main_empty_searching else R.string.main_empty_discovery_off),
+			style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.onSurfaceVariant,
+			textAlign = TextAlign.Center, modifier = Modifier.padding(top = 8.dp))
+		Button(onClick = onRegister, modifier = Modifier.padding(top = 24.dp).heightIn(min = 48.dp)) {
+			Text(stringResource(R.string.action_register))
+		}
+		OutlinedButton(onClick = onAddManual, modifier = Modifier.padding(top = 8.dp).heightIn(min = 48.dp)) {
+			Text(stringResource(R.string.action_add_manual))
+		}
 	}
 }
 
 @Composable
-private fun HostCard(host: DisplayHost, onClick: () -> Unit, onWakeup: () -> Unit, onEdit: () -> Unit, onDelete: () -> Unit)
+private fun HostCard(
+	host: DisplayHost,
+	onPlay: () -> Unit,
+	onWakeup: () -> Unit,
+	onRegister: () -> Unit,
+	onEdit: () -> Unit,
+	onDelete: () -> Unit
+)
 {
-	val canWakeup = host.registeredHost != null
+	val registered = host.isRegistered
 	val canEditDelete = host is ManualDisplayHost
+	val status = host.status()
 	var menuOpen by remember { mutableStateOf(false) }
 
-	val image = when
-	{
-		host is DiscoveredDisplayHost -> when(host.discoveredHost.state)
+	val title = host.name ?: host.host
+	val appName = (host as? DiscoveredDisplayHost)?.discoveredHost?.runningAppName
+
+	Card(
+		Modifier.fillMaxWidth(),
+		shape = RoundedCornerShape(24.dp),
+		colors = CardDefaults.cardColors(containerColor = MaterialTheme.colorScheme.surfaceContainer)
+	) {
+		Column(Modifier.padding(start = 20.dp, end = 8.dp, top = 16.dp, bottom = 16.dp))
 		{
-			DiscoveryHost.State.STANDBY -> if(host.isPS5) R.drawable.ic_console_ps5_standby else R.drawable.ic_console_standby
-			DiscoveryHost.State.READY -> if(host.isPS5) R.drawable.ic_console_ps5_ready else R.drawable.ic_console_ready
-			else -> if(host.isPS5) R.drawable.ic_console_ps5 else R.drawable.ic_console
-		}
-		host.isPS5 -> R.drawable.ic_console_ps5
-		else -> R.drawable.ic_console
-	}
-
-	val id = host.id
-	val idText = if(id == null) "" else stringResource(
-		if(host.isRegistered) R.string.display_host_id_registered else R.string.display_host_id_unregistered, id)
-	val bottomText = (host as? DiscoveredDisplayHost)?.discoveredHost?.let { discovered ->
-		if(discovered.runningAppName != null || discovered.runningAppTitleid != null)
-			stringResource(R.string.display_host_app_title_id, discovered.runningAppName ?: "", discovered.runningAppTitleid ?: "")
-		else
-			""
-	} ?: ""
-
-	Card(Modifier.fillMaxWidth().height(250.dp).clickable(onClick = onClick))
-	{
-		Box(Modifier.fillMaxSize())
-		{
-			if(host is DiscoveredDisplayHost)
-				Box(Modifier.align(Alignment.TopStart))
-				{
-					Image(painterResource(R.drawable.ic_triangle), null, Modifier.size(72.dp))
-					Image(painterResource(R.drawable.ic_discovered_on_secondary), null, Modifier.padding(8.dp))
-				}
-
-			Column(Modifier.fillMaxSize().padding(8.dp), horizontalAlignment = Alignment.CenterHorizontally)
+			Row(verticalAlignment = Alignment.CenterVertically)
 			{
-				Text(
-					host.name ?: "",
-					fontFamily = condensedMedium, fontSize = 32.sp, textAlign = TextAlign.Center,
-					maxLines = 1, overflow = TextOverflow.Ellipsis)
-				Text(
-					stringResource(R.string.display_host_host, host.host),
-					fontFamily = condensedMedium, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-				Text(idText, fontFamily = condensedMedium, fontSize = 16.sp, maxLines = 1, overflow = TextOverflow.Ellipsis)
-				Image(
-					painterResource(image), null,
-					Modifier.weight(1f).fillMaxWidth().padding(horizontal = 32.dp, vertical = 4.dp),
-					contentScale = ContentScale.Fit)
-				Text(
-					bottomText,
-					fontFamily = condensedLight, fontSize = 16.sp, textAlign = TextAlign.Center,
-					maxLines = 2, overflow = TextOverflow.Ellipsis,
-					color = MaterialTheme.colorScheme.onSurface)
-			}
-
-			if(canWakeup || canEditDelete)
-				Box(Modifier.align(Alignment.BottomEnd))
+				Box(
+					Modifier.size(48.dp).background(MaterialTheme.colorScheme.surfaceContainerHighest, CircleShape),
+					contentAlignment = Alignment.Center
+				) {
+					Icon(
+						androidx.compose.ui.res.painterResource(R.drawable.ic_gamepad), contentDescription = null,
+						tint = MaterialTheme.colorScheme.primary, modifier = Modifier.size(26.dp))
+				}
+				Column(Modifier.weight(1f).padding(start = 16.dp))
 				{
+					Text(title, style = MaterialTheme.typography.titleLarge, maxLines = 1, overflow = TextOverflow.Ellipsis)
+					Text(
+						stringResource(R.string.main_console_subtitle, stringResource(if(host.isPS5) R.string.console_ps5 else R.string.console_ps4), host.host),
+						style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+						maxLines = 1, overflow = TextOverflow.Ellipsis)
+				}
+				Box {
 					IconButton(onClick = { menuOpen = true }) {
 						DrawableIcon(R.drawable.ic_overflow, stringResource(R.string.action_more))
 					}
 					DropdownMenu(expanded = menuOpen, onDismissRequest = { menuOpen = false }) {
-						if(canWakeup)
+						if(registered)
 							DropdownMenuItem(
 								text = { Text(stringResource(R.string.action_wakeup)) },
 								onClick = { menuOpen = false; onWakeup() })
@@ -330,6 +333,62 @@ private fun HostCard(host: DisplayHost, onClick: () -> Unit, onWakeup: () -> Uni
 						}
 					}
 				}
+			}
+
+			Row(
+				Modifier.padding(top = 12.dp, end = 12.dp),
+				verticalAlignment = Alignment.CenterVertically,
+				horizontalArrangement = Arrangement.spacedBy(8.dp)
+			) {
+				StatusChip(status)
+				if(!registered)
+					Text(
+						stringResource(R.string.status_unregistered),
+						style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurfaceVariant)
+			}
+
+			if(appName != null)
+				Text(
+					stringResource(R.string.main_playing_now, appName),
+					style = MaterialTheme.typography.bodyMedium, color = MaterialTheme.colorScheme.onSurfaceVariant,
+					maxLines = 1, overflow = TextOverflow.Ellipsis,
+					modifier = Modifier.padding(top = 8.dp, end = 12.dp))
+
+			Row(
+				Modifier.fillMaxWidth().padding(top = 16.dp, end = 12.dp),
+				horizontalArrangement = Arrangement.spacedBy(8.dp)
+			) {
+				if(!registered)
+					Button(onClick = onRegister, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+						Text(stringResource(R.string.action_register))
+					}
+				else
+				{
+					if(status == ConsoleStatus.STANDBY)
+						FilledTonalButton(onClick = onWakeup, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+							Text(stringResource(R.string.action_wakeup))
+						}
+					Button(onClick = onPlay, modifier = Modifier.weight(1f).heightIn(min = 48.dp)) {
+						Icon(Icons.Filled.PlayArrow, contentDescription = null, modifier = Modifier.size(20.dp))
+						Text(stringResource(R.string.main_play), modifier = Modifier.padding(start = 4.dp))
+					}
+				}
+			}
 		}
+	}
+}
+
+@Composable
+private fun StatusChip(status: ConsoleStatus)
+{
+	Row(
+		Modifier.background(MaterialTheme.colorScheme.surfaceContainerHigh, RoundedCornerShape(50)).padding(horizontal = 10.dp, vertical = 4.dp),
+		verticalAlignment = Alignment.CenterVertically
+	) {
+		Box(Modifier.size(8.dp).background(status.color, CircleShape))
+		Text(
+			stringResource(status.label),
+			style = MaterialTheme.typography.labelMedium, color = MaterialTheme.colorScheme.onSurface,
+			modifier = Modifier.padding(start = 6.dp))
 	}
 }

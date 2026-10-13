@@ -76,6 +76,12 @@ class Preferences(context: Context)
 		get() = sharedPreferences.getBoolean(touchpadOnlyEnabledKey, false)
 		set(value) { sharedPreferences.edit().putBoolean(touchpadOnlyEnabledKey, value).apply() }
 
+	// DUALPLAY: opacidad de los controles táctiles en % (se aplica a la vista; 100 = como están dibujados).
+	val touchControlsOpacityKey get() = resources.getString(R.string.preferences_touch_controls_opacity_key)
+	var touchControlsOpacity
+		get() = sharedPreferences.getInt(touchControlsOpacityKey, 100).coerceIn(20, 100)
+		set(value) { sharedPreferences.edit().putInt(touchControlsOpacityKey, value.coerceIn(20, 100)).apply() }
+
 	val rumbleEnabledKey get() = resources.getString(R.string.preferences_rumble_enabled_key)
 	var rumbleEnabled
 		get() = sharedPreferences.getBoolean(rumbleEnabledKey, true)

@@ -3,57 +3,50 @@
 package com.hdrdualcontroller.app.stream
 
 import android.Manifest
-import android.animation.Animator
-import android.animation.AnimatorListenerAdapter
-import android.app.AlertDialog
-import android.graphics.Matrix
-import android.os.*
-import android.view.*
-import android.widget.EditText
-import androidx.appcompat.app.AppCompatActivity
-import androidx.core.content.IntentCompat
-import androidx.lifecycle.lifecycleScope
-import androidx.core.view.ViewCompat
 import android.content.pm.ActivityInfo
 import android.content.pm.PackageManager
+import android.os.*
+import android.view.*
 import android.widget.Toast
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.appcompat.app.AppCompatActivity
+import androidx.compose.runtime.getValue
+import androidx.compose.runtime.livedata.observeAsState
+import androidx.compose.runtime.mutableIntStateOf
+import androidx.compose.runtime.mutableStateOf
+import androidx.compose.runtime.setValue
+import androidx.compose.ui.platform.ViewCompositionStrategy
+import androidx.core.content.IntentCompat
+import androidx.core.view.ViewCompat
 import androidx.core.view.WindowCompat
 import androidx.core.view.WindowInsetsCompat
 import androidx.core.view.WindowInsetsControllerCompat
-import androidx.core.view.isGone
-import androidx.core.view.isVisible
 import androidx.fragment.app.Fragment
 import androidx.lifecycle.*
-import com.google.android.material.dialog.MaterialAlertDialogBuilder
 import com.hdrdualcontroller.app.R
 import com.hdrdualcontroller.app.common.Preferences
 import com.hdrdualcontroller.app.common.ext.viewModelFactory
 import com.hdrdualcontroller.app.databinding.ActivityStreamBinding
 import com.hdrdualcontroller.app.lib.Codec
 import com.hdrdualcontroller.app.lib.ConnectInfo
-import com.hdrdualcontroller.app.lib.ConnectVideoProfile
 import com.hdrdualcontroller.app.session.*
-import com.hdrdualcontroller.app.touchcontrols.DefaultTouchControlsFragment
 import com.hdrdualcontroller.app.touchcontrols.TouchControlsFragment
 import com.hdrdualcontroller.app.touchcontrols.TouchpadOnlyFragment
+import com.hdrdualcontroller.app.ui.stream.StreamOptions
+import com.hdrdualcontroller.app.ui.stream.StreamOverlay
+import com.hdrdualcontroller.app.ui.theme.DualPlayTheme
 import kotlinx.coroutines.Job
 import kotlinx.coroutines.flow.launchIn
 import kotlinx.coroutines.flow.onEach
 import kotlin.math.min
-
-private sealed class DialogContents
-private object StreamQuitDialog: DialogContents()
-private object CreateErrorDialog: DialogContents()
-private object PinRequestDialog: DialogContents()
 
 class StreamActivity : AppCompatActivity()
 {
 	companion object
 	{
 		const val EXTRA_CONNECT_INFO = "connect_info"
-		private const val HIDE_UI_TIMEOUT_MS = 2000L
-		private const val OVERLAY_MENU_TIMEOUT_MS = 8000L // overlay abierto con el botón: da tiempo a tocar un interruptor
+		const val EXTRA_CONSOLE_NAME = "console_name"
+		private const val HIDE_SYSTEM_UI_TIMEOUT_MS = 2000L
 	}
 
 	private lateinit var viewModel: StreamViewModel
@@ -61,6 +54,12 @@ class StreamActivity : AppCompatActivity()
 	private lateinit var insetsController: WindowInsetsControllerCompat
 
 	private val uiVisibilityHandler = Handler(Looper.getMainLooper())
+
+	// Estado del overlay en Compose.
+	private var panelOpen by mutableStateOf(false)
+	private var micEnabled by mutableStateOf(false)
+	private var displayMode by mutableStateOf(TransformMode.FIT)
+	private var controlsOpacity by mutableIntStateOf(100)
 
 	override fun onCreate(savedInstanceState: Bundle?)
 	{
@@ -72,6 +71,7 @@ class StreamActivity : AppCompatActivity()
 			finish()
 			return
 		}
+		val consoleName = intent.getStringExtra(EXTRA_CONSOLE_NAME) ?: connectInfo.host
 
 		viewModel = ViewModelProvider(this, viewModelFactory {
 			StreamViewModel(application, connectInfo)
@@ -81,6 +81,8 @@ class StreamActivity : AppCompatActivity()
 
 		binding = ActivityStreamBinding.inflate(layoutInflater)
 		setContentView(binding.root)
+
+		controlsOpacity = viewModel.preferences.touchControlsOpacity
 
 		// DUALPLAY: sin COLOR_MODE_HDR la ventana se compone en SDR y el HDR10 sale lavado. Solo si el stream es HDR
 		// (el perfil ya pasó por HdrSupport.adjust, así que la pantalla lo soporta).
@@ -93,67 +95,70 @@ class StreamActivity : AppCompatActivity()
 
 		ViewCompat.setOnApplyWindowInsetsListener(window.decorView) { _, insets ->
 			// DUALPLAY: isVisible(systemBars()) exige que TODAS las barras estén visibles; con navegación por gestos la
-			// barra inferior casi nunca lo está y el overlay no salía al deslizar. Basta con que se vea alguna.
+			// barra inferior casi nunca lo está y el panel no salía al deslizar. Basta con que se vea alguna.
 			val systemBars = insets.isVisible(WindowInsetsCompat.Type.statusBars()) || insets.isVisible(WindowInsetsCompat.Type.navigationBars())
 			if(systemBars)
-				showOverlay()
-			else
-				hideOverlay()
+			{
+				panelOpen = true
+				uiVisibilityHandler.removeCallbacks(hideSystemUIRunnable)
+				uiVisibilityHandler.postDelayed(hideSystemUIRunnable, HIDE_SYSTEM_UI_TIMEOUT_MS)
+			}
 			insets
 		}
 
-		viewModel.onScreenControlsEnabled.observe(this, Observer {
-			if(binding.onScreenControlsSwitch.isChecked != it)
-				binding.onScreenControlsSwitch.isChecked = it
-			if(binding.onScreenControlsSwitch.isChecked)
-				binding.touchpadOnlySwitch.isChecked = false
-		})
-		binding.onScreenControlsSwitch.setOnCheckedChangeListener { _, isChecked ->
-			viewModel.setOnScreenControlsEnabled(isChecked)
-			showOverlay()
-		}
-
-		viewModel.touchpadOnlyEnabled.observe(this, Observer {
-			if(binding.touchpadOnlySwitch.isChecked != it)
-				binding.touchpadOnlySwitch.isChecked = it
-			if(binding.touchpadOnlySwitch.isChecked)
-				binding.onScreenControlsSwitch.isChecked = false
-		})
-		binding.touchpadOnlySwitch.setOnCheckedChangeListener { _, isChecked ->
-			viewModel.setTouchpadOnlyEnabled(isChecked)
-			showOverlay()
-		}
-
-		binding.displayModeToggle.addOnButtonCheckedListener { _, _, _ ->
-			adjustStreamViewAspect()
-			showOverlay()
-		}
-
-		//viewModel.session.attachToTextureView(textureView)
 		viewModel.session.attachToSurfaceView(binding.surfaceView)
-		binding.overlayHandle.setOnClickListener {
-			overlayTimeoutMs = OVERLAY_MENU_TIMEOUT_MS
-			showOverlay()
-		}
-		binding.micSwitch.setOnCheckedChangeListener { _, isChecked ->
-			if(isChecked)
-			{
-				if(checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
-					applyMicrophone(true)
-				else
-					micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
-			}
-			else
-				viewModel.session.setMicrophoneEnabled(false)
-			showOverlay()
-		}
 
 		// DUALPLAY: el touchpad del DualSense llega como puntero; con la captura no sale el cursor y entrega los dedos.
 		binding.surfaceView.isFocusable = true
 		binding.surfaceView.isFocusableInTouchMode = true
 		binding.surfaceView.setOnCapturedPointerListener { _, event -> viewModel.input.onCapturedPointerEvent(event) }
-		viewModel.session.state.observe(this, Observer { this.stateChanged(it) })
-		adjustStreamViewAspect()
+
+		viewModel.session.state.observe(this, Observer {
+			// Una salida normal (no error) cierra la pantalla; los errores los muestra el overlay.
+			if(it is StreamStateQuit && !it.reason.isError)
+				finish()
+		})
+		applyDisplayMode(TransformMode.FIT)
+
+		binding.composeOverlay.setViewCompositionStrategy(ViewCompositionStrategy.DisposeOnViewTreeLifecycleDestroyed)
+		binding.composeOverlay.setContent {
+			DualPlayTheme {
+				val state by viewModel.session.state.observeAsState(StreamStateIdle)
+				val onScreenControls by viewModel.onScreenControlsEnabled.observeAsState(true)
+				val touchpadOnly by viewModel.touchpadOnlyEnabled.observeAsState(false)
+				StreamOverlay(
+					consoleName = consoleName,
+					state = state,
+					panelOpen = panelOpen,
+					onPanelOpenChange = { panelOpen = it },
+					options = StreamOptions(
+						onScreenControls = onScreenControls,
+						touchpadOnly = touchpadOnly,
+						microphone = micEnabled,
+						displayMode = displayMode,
+						controlsOpacityPercent = controlsOpacity,
+						onOnScreenControls = {
+							viewModel.setOnScreenControlsEnabled(it)
+							if(it)
+								viewModel.setTouchpadOnlyEnabled(false)
+						},
+						onTouchpadOnly = {
+							viewModel.setTouchpadOnlyEnabled(it)
+							if(it)
+								viewModel.setOnScreenControlsEnabled(false)
+						},
+						onMicrophone = ::setMicrophone,
+						onDisplayMode = ::applyDisplayMode,
+						onControlsOpacity = {
+							controlsOpacity = it
+							viewModel.preferences.touchControlsOpacity = it
+							applyControlsOpacity()
+						}),
+					onReconnect = ::reconnect,
+					onQuit = { finish() },
+					onSubmitPin = { viewModel.session.setLoginPin(it) })
+			}
+		}
 
 		if(Preferences(this).rumbleEnabled)
 		{
@@ -179,8 +184,24 @@ class StreamActivity : AppCompatActivity()
 			applyMicrophone(true)
 		else
 		{
-			binding.micSwitch.isChecked = false
+			micEnabled = false
 			Toast.makeText(this, R.string.stream_microphone_denied, Toast.LENGTH_LONG).show()
+		}
+	}
+
+	private fun setMicrophone(enabled: Boolean)
+	{
+		if(enabled)
+		{
+			if(checkSelfPermission(Manifest.permission.RECORD_AUDIO) == PackageManager.PERMISSION_GRANTED)
+				applyMicrophone(true)
+			else
+				micPermissionLauncher.launch(Manifest.permission.RECORD_AUDIO)
+		}
+		else
+		{
+			micEnabled = false
+			viewModel.session.setMicrophoneEnabled(false)
 		}
 	}
 
@@ -188,9 +209,11 @@ class StreamActivity : AppCompatActivity()
 	{
 		if(!viewModel.session.setMicrophoneEnabled(enabled) && enabled)
 		{
-			binding.micSwitch.isChecked = false
+			micEnabled = false
 			Toast.makeText(this, R.string.stream_microphone_failed, Toast.LENGTH_LONG).show()
 		}
+		else
+			micEnabled = enabled
 	}
 
 	override fun onAttachFragment(fragment: Fragment)
@@ -211,7 +234,8 @@ class StreamActivity : AppCompatActivity()
 	override fun onResume()
 	{
 		super.onResume()
-		binding.micSwitch.isChecked = false // la sesión arranca con el micrófono silenciado
+		micEnabled = false // la sesión arranca con el micrófono silenciado
+		applyControlsOpacity()
 		hideSystemUI()
 		viewModel.session.resume()
 	}
@@ -236,42 +260,6 @@ class StreamActivity : AppCompatActivity()
 
 	private val hideSystemUIRunnable = Runnable { hideSystemUI() }
 
-	private var overlayTimeoutMs = HIDE_UI_TIMEOUT_MS
-	private val hideOverlayRunnable = Runnable { hideOverlay() }
-
-	private fun showOverlay()
-	{
-		binding.overlay.isVisible = true
-		binding.overlay.animate()
-			.alpha(1.0f)
-			.setListener(object: AnimatorListenerAdapter()
-			{
-				override fun onAnimationEnd(animation: Animator)
-				{
-					binding.overlay.alpha = 1.0f
-				}
-			})
-		uiVisibilityHandler.removeCallbacks(hideSystemUIRunnable)
-		uiVisibilityHandler.postDelayed(hideSystemUIRunnable, overlayTimeoutMs)
-		// Si las barras del sistema ya estaban ocultas no hay cambio de insets que oculte el overlay: se oculta por tiempo.
-		uiVisibilityHandler.removeCallbacks(hideOverlayRunnable)
-		uiVisibilityHandler.postDelayed(hideOverlayRunnable, overlayTimeoutMs)
-	}
-
-	private fun hideOverlay()
-	{
-		overlayTimeoutMs = HIDE_UI_TIMEOUT_MS
-		binding.overlay.animate()
-			.alpha(0.0f)
-			.setListener(object: AnimatorListenerAdapter()
-			{
-				override fun onAnimationEnd(animation: Animator)
-				{
-					binding.overlay.isGone = true
-				}
-			})
-	}
-
 	override fun onWindowFocusChanged(hasFocus: Boolean)
 	{
 		super.onWindowFocusChanged(hasFocus)
@@ -290,128 +278,20 @@ class StreamActivity : AppCompatActivity()
 		insetsController.hide(WindowInsetsCompat.Type.systemBars())
 	}
 
-	private var dialogContents: DialogContents? = null
-	private var dialog: AlertDialog? = null
-		set(value)
-		{
-			field = value
-			if(value == null)
-				dialogContents = null
-		}
-
-	private fun stateChanged(state: StreamState)
+	private fun applyDisplayMode(mode: TransformMode)
 	{
-		binding.progressBar.visibility = if(state == StreamStateConnecting) View.VISIBLE else View.GONE
-
-		when(state)
-		{
-			is StreamStateQuit ->
-			{
-				if(dialogContents != StreamQuitDialog)
-				{
-					if(state.reason.isError)
-					{
-						dialog?.dismiss()
-						val reasonStr = state.reasonString
-						val dialog = MaterialAlertDialogBuilder(this)
-							.setMessage(getString(R.string.alert_message_session_quit, state.reason.toString())
-									+ (if(reasonStr != null) "\n$reasonStr" else ""))
-							.setPositiveButton(R.string.action_reconnect) { _, _ ->
-								dialog = null
-								reconnect()
-							}
-							.setOnCancelListener {
-								dialog = null
-								finish()
-							}
-							.setNegativeButton(R.string.action_quit_session) { _, _ ->
-								dialog = null
-								finish()
-							}
-							.create()
-						dialogContents = StreamQuitDialog
-						dialog.show()
-					}
-					else
-						finish()
-				}
-			}
-
-			is StreamStateCreateError ->
-			{
-				if(dialogContents != CreateErrorDialog)
-				{
-					dialog?.dismiss()
-					val dialog = MaterialAlertDialogBuilder(this)
-						.setMessage(getString(R.string.alert_message_session_create_error, state.error.errorCode.toString()))
-						.setOnDismissListener {
-							dialog = null
-							finish()
-						}
-						.setNegativeButton(R.string.action_quit_session) { _, _ -> }
-						.create()
-					dialogContents = CreateErrorDialog
-					dialog.show()
-				}
-			}
-
-			is StreamStateLoginPinRequest ->
-			{
-				if(dialogContents != PinRequestDialog)
-				{
-					dialog?.dismiss()
-
-					val view = layoutInflater.inflate(R.layout.dialog_login_pin, null)
-					val pinEditText = view.findViewById<EditText>(R.id.pinEditText)
-
-					val dialog = MaterialAlertDialogBuilder(this)
-						.setMessage(
-							if(state.pinIncorrect)
-								R.string.alert_message_login_pin_request_incorrect
-							else
-								R.string.alert_message_login_pin_request)
-						.setView(view)
-						.setPositiveButton(R.string.action_login_pin_connect) { _, _ ->
-							dialog = null
-							viewModel.session.setLoginPin(pinEditText.text.toString())
-						}
-						.setOnCancelListener {
-							dialog = null
-							finish()
-						}
-						.setNegativeButton(R.string.action_quit_session) { _, _ ->
-							dialog = null
-							finish()
-						}
-						.create()
-					dialogContents = PinRequestDialog
-					dialog.show()
-				}
-			}
-			else ->{}
-		}
-	}
-
-	private fun adjustTextureViewAspect(textureView: TextureView)
-	{
-		val trans = TextureViewTransform(viewModel.session.connectInfo.videoProfile, textureView)
-		val resolution = trans.resolutionFor(TransformMode.fromButton(binding.displayModeToggle.checkedButtonId))
-		Matrix().also {
-			textureView.getTransform(it)
-			it.setScale(resolution.width / trans.viewWidth, resolution.height / trans.viewHeight)
-			it.postTranslate((trans.viewWidth - resolution.width) * 0.5f, (trans.viewHeight - resolution.height) * 0.5f)
-			textureView.setTransform(it)
-		}
-	}
-
-	private fun adjustSurfaceViewAspect()
-	{
+		displayMode = mode
 		val videoProfile = viewModel.session.connectInfo.videoProfile
 		binding.aspectRatioLayout.aspectRatio = videoProfile.width.toFloat() / videoProfile.height.toFloat()
-		binding.aspectRatioLayout.mode = TransformMode.fromButton(binding.displayModeToggle.checkedButtonId)
+		binding.aspectRatioLayout.mode = mode
 	}
 
-	private fun adjustStreamViewAspect() = adjustSurfaceViewAspect()
+	/** La opacidad se aplica a las vistas de los controles táctiles (View), sin tocar su lógica de toques. */
+	private fun applyControlsOpacity()
+	{
+		val alpha = controlsOpacity / 100f
+		supportFragmentManager.fragments.filterIsInstance<TouchControlsFragment>().forEach { it.view?.alpha = alpha }
+	}
 
 	override fun dispatchKeyEvent(event: KeyEvent) = viewModel.input.dispatchKeyEvent(event) || super.dispatchKeyEvent(event)
 	override fun onGenericMotionEvent(event: MotionEvent) = viewModel.input.onGenericMotionEvent(event) || super.onGenericMotionEvent(event)
@@ -421,56 +301,5 @@ enum class TransformMode
 {
 	FIT,
 	STRETCH,
-	ZOOM;
-
-	companion object
-	{
-		fun fromButton(displayModeButtonId: Int)
-			= when (displayModeButtonId)
-			{
-				R.id.display_mode_stretch_button -> STRETCH
-				R.id.display_mode_zoom_button -> ZOOM
-				else -> FIT
-			}
-	}
+	ZOOM
 }
-
-class TextureViewTransform(private val videoProfile: ConnectVideoProfile, private val textureView: TextureView)
-{
-	private val contentWidth : Float get() = videoProfile.width.toFloat()
-	private val contentHeight : Float get() = videoProfile.height.toFloat()
-	val viewWidth : Float get() = textureView.width.toFloat()
-	val viewHeight : Float get() = textureView.height.toFloat()
-	private val contentAspect : Float get() =  contentHeight / contentWidth
-
-	fun resolutionFor(mode: TransformMode): Resolution
-		= when(mode)
-		{
-			TransformMode.STRETCH -> strechedResolution
-			TransformMode.ZOOM -> zoomedResolution
-			TransformMode.FIT -> normalResolution
-		}
-
-	private val strechedResolution get() = Resolution(viewWidth, viewHeight)
-
-	private val zoomedResolution get() =
-		if(viewHeight > viewWidth * contentAspect)
-		{
-			val zoomFactor = viewHeight / contentHeight
-			Resolution(contentWidth * zoomFactor, viewHeight)
-		}
-		else
-		{
-			val zoomFactor = viewWidth / contentWidth
-			Resolution(viewWidth, contentHeight * zoomFactor)
-		}
-
-	private val normalResolution get() =
-		if(viewHeight > viewWidth * contentAspect)
-			Resolution(viewWidth, viewWidth * contentAspect)
-		else
-			Resolution(viewHeight / contentAspect, viewHeight)
-}
-
-
-data class Resolution(val width: Float, val height: Float)

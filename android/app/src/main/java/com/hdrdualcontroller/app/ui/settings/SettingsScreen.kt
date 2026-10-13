@@ -138,6 +138,53 @@ fun SettingsScreen(
 	AppScaffold(title = stringResource(R.string.title_settings), onBack = onBack) { padding ->
 		Column(Modifier.padding(padding).verticalScroll(rememberScrollState()))
 		{
+			Section(R.string.settings_section_video)
+			ClickItem(R.drawable.ic_resolution, R.string.preferences_resolution_title, stringResource(resolution.title)) { showResolution = true }
+			ClickItem(R.drawable.ic_fps, R.string.preferences_fps_title, stringResource(fps.title)) { showFps = true }
+			ClickItem(
+				R.drawable.ic_bitrate, R.string.preferences_bitrate_title,
+				bitrate?.toString() ?: stringResource(R.string.preferences_bitrate_auto, bitrateAuto)
+			) { showBitrate = true }
+			ClickItem(R.drawable.ic_codec, R.string.preferences_codec_title, stringResource(codec.title)) { showCodec = true }
+
+			HorizontalDivider()
+			Section(R.string.settings_section_controller)
+			ClickItem(R.drawable.ic_gamepad, R.string.preferences_button_remap_title, stringResource(R.string.preferences_button_remap_summary), onOpenButtonMapping)
+			SwitchItem(R.drawable.ic_gamepad, R.string.preferences_swap_cross_moon_title, R.string.preferences_swap_cross_moon_summary, swapCrossMoon) {
+				swapCrossMoon = it; prefs.swapCrossMoon = it
+			}
+			SwitchItem(R.drawable.ic_gamepad, R.string.preferences_dualsense_features_title, R.string.preferences_dualsense_features_summary, dualsenseFeatures) { enabled ->
+				if(!enabled)
+				{
+					dualsenseFeatures = false
+					prefs.dualsenseFeatures = false
+				}
+				else if(ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED)
+				{
+					dualsenseFeatures = true
+					prefs.dualsenseFeatures = true
+				}
+				else
+					bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
+			}
+			SwitchItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_title, R.string.preferences_hd_haptics_summary, hdHaptics) {
+				hdHaptics = it; prefs.hdHaptics = it
+			}
+			SwitchItem(R.drawable.ic_motion, R.string.preferences_motion_enabled_title, R.string.preferences_motion_enabled_summary, motion) {
+				motion = it; prefs.motionEnabled = it
+			}
+			SwitchItem(R.drawable.ic_rumble, R.string.preferences_rumble_enabled_title, R.string.preferences_rumble_enabled_summary, rumble) {
+				rumble = it; prefs.rumbleEnabled = it
+			}
+			SwitchItem(R.drawable.ic_button_haptic, R.string.preferences_button_haptic_enabled_title, R.string.preferences_button_haptic_enabled_summary, buttonHaptic) {
+				buttonHaptic = it; prefs.buttonHapticEnabled = it
+			}
+
+			HorizontalDivider()
+			Section(R.string.settings_section_audio)
+			ClickItem(R.drawable.ic_gamepad, R.string.preferences_mic_gain_title, stringResource(R.string.preferences_mic_gain_value, micGain)) { showMicGain = true }
+
+			HorizontalDivider()
 			Section(R.string.psn_account_title)
 			if(psnAccountId == null)
 				ClickItem(
@@ -159,65 +206,21 @@ fun SettingsScreen(
 					psnOnlineId = null
 				}
 			}
+			ClickItem(
+				R.drawable.ic_gamepad, R.string.preferences_registered_hosts_title,
+				stringResource(R.string.preferences_registered_hosts_summary, registeredCount), onOpenRegisteredHosts)
 
 			HorizontalDivider()
-			Section(R.string.preferences_category_title_general)
-			ClickItem(
-				R.drawable.ic_console_simple, R.string.preferences_registered_hosts_title,
-				stringResource(R.string.preferences_registered_hosts_summary, registeredCount), onOpenRegisteredHosts)
-			SwitchItem(R.drawable.ic_gamepad, R.string.preferences_swap_cross_moon_title, R.string.preferences_swap_cross_moon_summary, swapCrossMoon) {
-				swapCrossMoon = it; prefs.swapCrossMoon = it
-			}
-			ClickItem(R.drawable.ic_gamepad, R.string.preferences_button_remap_title, stringResource(R.string.preferences_button_remap_summary), onOpenButtonMapping)
-			SwitchItem(R.drawable.ic_rumble, R.string.preferences_rumble_enabled_title, R.string.preferences_rumble_enabled_summary, rumble) {
-				rumble = it; prefs.rumbleEnabled = it
-			}
-			SwitchItem(R.drawable.ic_motion, R.string.preferences_motion_enabled_title, R.string.preferences_motion_enabled_summary, motion) {
-				motion = it; prefs.motionEnabled = it
-			}
-			SwitchItem(R.drawable.ic_button_haptic, R.string.preferences_button_haptic_enabled_title, R.string.preferences_button_haptic_enabled_summary, buttonHaptic) {
-				buttonHaptic = it; prefs.buttonHapticEnabled = it
-			}
-			SwitchItem(R.drawable.ic_gamepad, R.string.preferences_dualsense_features_title, R.string.preferences_dualsense_features_summary, dualsenseFeatures) { enabled ->
-				if(!enabled)
-				{
-					dualsenseFeatures = false
-					prefs.dualsenseFeatures = false
-				}
-				else if(ContextCompat.checkSelfPermission(context, Manifest.permission.BLUETOOTH_CONNECT) == PackageManager.PERMISSION_GRANTED)
-				{
-					dualsenseFeatures = true
-					prefs.dualsenseFeatures = true
-				}
-				else
-					bluetoothPermissionLauncher.launch(Manifest.permission.BLUETOOTH_CONNECT)
-			}
-			SwitchItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_title, R.string.preferences_hd_haptics_summary, hdHaptics) {
-				hdHaptics = it; prefs.hdHaptics = it
-			}
+			Section(R.string.settings_section_advanced)
 			ClickItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_gain_title, stringResource(R.string.preferences_hd_haptics_gain_value, hdGain)) { showHdGain = true }
 			ClickItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_buffer_title, stringResource(R.string.preferences_hd_haptics_buffer_value, hdBuffer)) { showHdBuffer = true }
 			SwitchItem(R.drawable.ic_rumble, R.string.preferences_hd_haptics_single_title, R.string.preferences_hd_haptics_single_summary, hdSingle) {
 				hdSingle = it; prefs.hdHapticsSingleBlock = it
 			}
-			ClickItem(R.drawable.ic_gamepad, R.string.preferences_mic_gain_title, stringResource(R.string.preferences_mic_gain_value, micGain)) { showMicGain = true }
 			SwitchItem(R.drawable.ic_log, R.string.preferences_log_verbose_title, R.string.preferences_log_verbose_summary, logVerbose) {
 				logVerbose = it; prefs.logVerbose = it
 			}
 			ClickItem(R.drawable.ic_log, R.string.preferences_logs_title, stringResource(R.string.preferences_logs_summary), onOpenLogs)
-
-			HorizontalDivider()
-			Section(R.string.preferences_category_title_stream)
-			ClickItem(R.drawable.ic_resolution, R.string.preferences_resolution_title, stringResource(resolution.title)) { showResolution = true }
-			ClickItem(R.drawable.ic_fps, R.string.preferences_fps_title, stringResource(fps.title)) { showFps = true }
-			ClickItem(
-				R.drawable.ic_bitrate, R.string.preferences_bitrate_title,
-				bitrate?.toString() ?: stringResource(R.string.preferences_bitrate_auto, bitrateAuto)
-			) { showBitrate = true }
-			ClickItem(R.drawable.ic_codec, R.string.preferences_codec_title, stringResource(codec.title)) { showCodec = true }
-
-			HorizontalDivider()
-			Section(R.string.preferences_category_title_export)
 			ClickItem(R.drawable.ic_export, R.string.preferences_export_settings_title, stringResource(R.string.preferences_export_settings_summary)) {
 				context.findActivity()?.let { exportAndShareAllSettings(it, scope) }
 			}

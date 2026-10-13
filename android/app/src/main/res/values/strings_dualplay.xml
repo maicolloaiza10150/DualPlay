@@ -99,4 +99,53 @@
     <string name="developer_dualsense_spike_summary">Trigger effects over USB-C (debug builds only)</string>
 
     <string name="preferences_bitrate_dialog_hint">Empty = automatic</string>
+
+    <!-- Main screen -->
+    <string name="main_play">Play</string>
+    <string name="main_add_console">Add console</string>
+    <string name="main_wake_sent">Wake-up signal sent</string>
+    <string name="main_console_subtitle">%1$s · %2$s</string>
+    <string name="main_playing_now">Playing: %s</string>
+    <string name="console_ps5">PS5</string>
+    <string name="console_ps4">PS4</string>
+    <string name="status_ready">Ready</string>
+    <string name="status_standby">Standby</string>
+    <string name="status_unreachable">Not responding</string>
+    <string name="status_manual">Manual entry</string>
+    <string name="status_unregistered">Not registered</string>
+    <string name="main_empty_title">Register your console</string>
+    <string name="main_empty_body">Link your PS5 or PS4 once with a PIN and you can play from this phone. Both devices must be on the same Wi-Fi network (5 GHz is best).</string>
+    <string name="main_empty_searching">Looking for consoles on your network…</string>
+    <string name="main_empty_discovery_off">Automatic discovery is off. Turn it on with the top-right button to find consoles on your network.</string>
+
+    <!-- Settings sections -->
+    <string name="settings_section_video">Video</string>
+    <string name="settings_section_controller">Controller</string>
+    <string name="settings_section_audio">Audio and microphone</string>
+    <string name="settings_section_advanced">Advanced</string>
+
+    <!-- Stream -->
+    <string name="stream_options_title">Stream options</string>
+    <string name="stream_display_mode">Picture size</string>
+    <string name="stream_display_fit">Fit</string>
+    <string name="stream_display_zoom">Zoom</string>
+    <string name="stream_display_stretch">Stretch</string>
+    <string name="stream_controls_opacity">On-screen controls opacity</string>
+    <string name="stream_end_session">End session</string>
+    <string name="stream_connecting_to">Connecting to %s…</string>
+    <string name="stream_connecting_hint">This can take a few seconds. A console in standby wakes up first.</string>
+    <string name="stream_pin_incorrect">Incorrect PIN. Try again.</string>
+    <string name="stream_error_busy_title">Console is busy</string>
+    <string name="stream_error_busy_body">Remote Play is already in use on this console. Close it on the other device or the TV, then reconnect.</string>
+    <string name="stream_error_unreachable_title">Could not reach the console</string>
+    <string name="stream_error_unreachable_body">Check that the console is on or in rest mode, and that the phone and the console are on the same network.</string>
+    <string name="stream_error_crash_title">Remote Play stopped on the console</string>
+    <string name="stream_error_crash_body">Restart the console and try again.</string>
+    <string name="stream_error_version_title">Console software not supported</string>
+    <string name="stream_error_version_body">Update the console system software, then try again.</string>
+    <string name="stream_error_lost_title">Connection lost</string>
+    <string name="stream_error_lost_body">The stream was interrupted. Check your Wi-Fi (5 GHz works best) and reconnect.</string>
+    <string name="stream_error_generic_title">Could not play</string>
+    <string name="stream_error_generic_body">Something went wrong while connecting. You can try again. If it keeps happening, share the session log from Settings.</string>
+    <string name="preferences_touch_controls_opacity_key">touch_controls_opacity</string>
 </resources>

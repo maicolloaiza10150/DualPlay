@@ -7,7 +7,7 @@ import androidx.activity.ComponentActivity
 import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import com.hdrdualcontroller.app.ui.AppNavHost
-import com.hdrdualcontroller.app.ui.theme.HdrDualControllerTheme
+import com.hdrdualcontroller.app.ui.theme.DualPlayTheme
 
 class MainActivity: ComponentActivity()
 {
@@ -16,7 +16,7 @@ class MainActivity: ComponentActivity()
 		enableEdgeToEdge()
 		super.onCreate(savedInstanceState)
 		setContent {
-			HdrDualControllerTheme {
+			DualPlayTheme {
 				AppNavHost()
 			}
 		}
